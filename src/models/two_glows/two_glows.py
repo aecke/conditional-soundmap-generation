@@ -38,8 +38,9 @@ class TwoGlows(nn.Module):
         
         self.use_temperature = right_configs.get('use_temperature', False)
         self.use_humidity = right_configs.get('use_humidity', False)
+        self.use_db = right_configs.get('use_db', False)
         
-        n_numerical = sum([self.use_temperature, self.use_humidity])
+        n_numerical = sum([self.use_temperature, self.use_humidity, self.use_db])
         if n_numerical > 0:
             self.numerical_net = NumericalCondNet(n_numerical)
 
@@ -113,7 +114,7 @@ class TwoGlows(nn.Module):
 
         return left_glow_outs, right_glow_outs
 
-    def reverse(self, x_a=None, z_b_samples=None, numerical_conditions=None, reconstruct=False, numerical_conditions=None):
+    def reverse(self, x_a=None, z_b_samples=None, numerical_conditions=None, reconstruct=False):
         print(f"TwoGlows reverse input shapes: x_a={x_a.shape if x_a is not None else None}, z_b_samples={z_b_samples[0].shape if z_b_samples else None}")
         left_glow_out = self.left_glow(x_a)  # left glow forward always needed before preparing conditions
         conditions = self.prep_conds(left_glow_out, numerical_conditions, direction='reverse')

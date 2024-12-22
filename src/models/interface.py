@@ -37,7 +37,7 @@ def take_samples(args, params, model, reverse_cond, n_samples=None):
             if args.direction == 'building2soundmap':
                 sampled_images = model.reverse(
                     x_a=reverse_cond,  # Jetzt mit korrekter Batch-Size
-                    z_b_samples=z_samples.
+                    z_b_samples=z_samples,
                     numerical_conditions=batch['numerical_conditions']
                 ).cpu().data
 
@@ -70,26 +70,6 @@ def take_samples(args, params, model, reverse_cond, n_samples=None):
                 raise NotImplementedError
 
         return sampled_images
-
-
-# def batch2revcond(args, img_batch, segment_batch, boundary_batch):  # only used in cityscapes experiments
-#     """
-#     Takes batches of data and arranges them as reverse condition based on the args.
-#     :param args:
-#     :param img_batch:
-#     :param segment_batch:
-#     :param boundary_batch:
-#     :return:
-#     """
-#     if args.direction == 'label2photo':
-#         reverse_cond = {'segment': segment_batch, 'boundary': boundary_batch}
-#
-#     elif args.direction == 'photo2label':  # 'photo2label'
-#         reverse_cond = {'real': img_batch}
-#
-#     else:
-#         raise NotImplementedError('Direction not implemented')
-#     return reverse_cond
 
 
 def verify_invertibility(args, params):

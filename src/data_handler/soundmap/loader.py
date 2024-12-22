@@ -10,7 +10,7 @@ import glob
 
 class SoundMapDataset(data.Dataset):
     SCALER_FILENAME = 'numerical_scaler.save'
-    
+    # test
     def __init__(self, data_folder, is_train=True, img_size=(256, 256), 
                  use_temperature=False, use_humidity=False, use_db=False):
         self.transforms = transforms.Compose([
@@ -28,8 +28,8 @@ class SoundMapDataset(data.Dataset):
         self.buildings_path = data_paths["buildings"]
         self.soundmaps_path = data_paths["soundmaps"]
         self.is_train = is_train
-        self.scaler_path = os.path.join(data_folder["train"], self.SCALER_FILENAME)
-        
+        self.scaler_path = os.path.join(os.path.dirname(data_folder["train"]["csv_path"]), self.SCALER_FILENAME)
+
         # CSV einlesen
         self.data = pd.read_csv(data_paths["csv_path"])
         

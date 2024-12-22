@@ -89,19 +89,22 @@ def extract_batches(batch, args):
         building_batch = batch['building'].to(device)
         soundmap_batch = batch['soundmap'].to(device)
         numerical_conditions = None
-        
-        # Numerische Bedingungen extrahieren falls vorhanden
-        if any([args.use_temperature, args.use_humidity, args.use_db]):
-            numerical_conditions = batch['numerical_conditions'].to(device)
-        
-        if args.direction == 'building2soundmap':
-            left_batch = building_batch
-            right_batch = soundmap_batch
+    
+    # Numerische Bedingungen nur extrahieren wenn die Flags gesetzt sind
+    if any([args.use_temperature, args.use_humidity, args.use_db]):
+        if 'numerical_conditions' not in batch:
+            print("Warning: Numerical conditions flags are set but no numerical data found in batch")
         else:
-            left_batch = soundmap_batch
-            right_batch = building_batch
+            numerical_conditions = batch['numerical_conditions'].to(device)
+    
+    if args.direction == 'building2soundmap':
+        left_batch = building_batch
+        right_batch = soundmap_batch
+    else:
+        left_batch = soundmap_batch
+        right_batch = building_batch
 
-        return left_batch, right_batch, numerical_conditions
+    return left_batch, right_batch, numerical_conditions
 
 
 def init_data_loaders(args, params):
@@ -122,7 +125,10 @@ def init_data_loaders(args, params):
         train_dataset = soundmap.SoundMapDataset(
             data_folder=params['data_folder'],
             is_train=True,
-            img_size=params['img_size']
+            img_size=params['img_size'],
+            use_temperature=args.use_temperature,  # Diese Parameter hinzufügen
+            use_humidity=args.use_humidity,
+            use_db=args.use_db
         )
         train_loader = torch.utils.data.DataLoader(
             train_dataset, 
@@ -134,7 +140,10 @@ def init_data_loaders(args, params):
         val_dataset = soundmap.SoundMapDataset(
             data_folder=params['data_folder'],
             is_train=False,
-            img_size=params['img_size']
+            img_size=params['img_size'],
+            use_temperature=args.use_temperature,  # Diese Parameter hinzufügen
+            use_humidity=args.use_humidity,
+            use_db=args.use_db
         )
         val_loader = torch.utils.data.DataLoader(
             val_dataset, 
