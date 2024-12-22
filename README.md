@@ -1,133 +1,111 @@
-# Full-Glow
-This repo contains the implementation of *Full-Glow: Fully conditional Glow for more realistic image generation*:
-[https://arxiv.org/abs/2012.05846](https://arxiv.org/abs/2012.05846). A short presentation of the work could be seen [here](https://www.youtube.com/watch?v=lbvYIJIczjU).
+# Full-Glow for Urban Sound Maps
 
-Full-Glow extends on previous Glow-based models for conditional image generation by applying conditioning to all Glow operations 
-using appropriate conditioning networks. It was applied to the [Cityscapes](https://www.cityscapes-dataset.com/) dataset (label &#8594; photo) for synthesizing street-scene images.
+This repository contains an adapted implementation of Full-Glow for urban sound map generation. It is based on [Full-Glow: Fully conditional Glow for more realistic image generation](https://arxiv.org/abs/2012.05846).
 
+The original Full-Glow model has been modified to work with sound map data, allowing for the generation of sound maps from building layouts while optionally considering environmental conditions like temperature, humidity and sound levels.
 
-## Quantitative results
-Full-Glow was evaluated quantitatively against previous Glow-based models ([C-Glow](https://arxiv.org/abs/1905.13288) and [DUAL-Glow](https://pitt.edu/~sjh95/teaching/related_papers/dual_glow.pdf)) along with the GAN-based model [pix2pix](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) using the [PSPNet](https://github.com/hszhao/semseg)
-classifier. With each trained model, we did inference on the Cityscapes validation set 3 times and calculated the PSP scores.
+## Environment Setup
 
-| Model          | Conditional BPD &#8595; | Mean pixel acc. &#8593; | Mean class acc. &#8593; | Mean class IoU  &#8593; |
-| -------------- | ----------------------- | ----------------------- | ----------------------- | ----------------------- |
-| C-Glow v.1     | 2.568                   | 35.02 ± 0.56            | 12.15 ± 0.05            | 7.33 ± 0.09             |
-| C-Glow v.2     | 2.363                   | 52.33 ± 0.46            | 17.37 ± 0.21            | 12.31 ± 0.24            |
-| Dual-Glow      | 2.585                   | 71.44 ± 0.03            | 23.91 ± 0.19            | 18.96 ± 0.17            |
-| pix2pix        | ---                     | 60.56 ± 0.11            | 22.64 ± 0.21            | 16.42 ± 0.06            |
-| **Full-Glow**  | **2.345**               | **73.50 ± 0.13**        | **29.13 ± 0.39**        | **23.86 ± 0.30**        |
-| *Ground-truth* | *---*                   | *95.97*                 | *84.31*                 | *77.30*                 |
+1. Create a new virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+```
 
+2. Install required packages:
+```bash
+pip install -r requirements.txt
+```
 
+## Data Structure
 
-## Visual samples in 512x1024 resolution (please zoom to see more details)
-<pre>
-                          Condition                        Synthesized
-</pre>
+The model expects the following data structure:
+- Training data CSV containing building-soundmap pairs and environmental conditions
+- Building images (grayscale)
+- Sound map images (256x256 pixels)
 
-<p align="middle">
-  <img src="figs/high_res/diverse/jena_000066_000019/segment.png" width="300" />
-  <img src="figs/high_res/diverse/jena_000066_000019/sample_3.png" width="300" />
-</p>
+Configure the data paths in `params.json`:
+```json
+"soundmap": {
+    "data_folder": {
+        "train": {
+            "buildings": "path/to/train/buildings",
+            "soundmaps": "path/to/train/soundmaps/256",
+            "csv_path": "path/to/train.csv"
+        },
+        "test": {
+            "buildings": "path/to/test/buildings", 
+            "soundmaps": "path/to/test/soundmaps/256",
+            "csv_path": "path/to/test.csv"
+        }
+    },
+    "samples_path": "path/to/samples",
+    "checkpoints_path": "path/to/checkpoints"
+}
+```
 
-<p align="middle">
-  <img src="figs/high_res/diverse/aachen_000058_000019/segment.png" width="300" />
-  <img src="figs/high_res/diverse/aachen_000058_000019/sample_5.png" width="300" />
-</p>
+## Training Commands
 
-<p align="middle">
-  <img src="figs/high_res/single/aachen_000011_000019/segment.png" width="300" />
-  <img src="figs/high_res/single/aachen_000011_000019/sample_3.png" width="300" />
-</p>
+### Basic Training
+Train the model using only building layouts to generate sound maps:
+```bash
+python main.py --dataset soundmap --direction building2soundmap --model glow_improved
+```
 
-<p align="middle">
-  <img src="figs/high_res/single/aachen_000096_000019/segment.png" width="300" />
-  <img src="figs/high_res/single/aachen_000096_000019/sample_6.png" width="300" />
-</p>
+### Training with Environmental Conditions
+You can include different combinations of environmental conditions:
 
-<p align="middle">
-  <img src="figs/high_res/single/aachen_000156_000019/segment.png" width="300" />
-  <img src="figs/high_res/single/aachen_000156_000019/sample_6.png" width="300" />
-</p>
+1. Using temperature only:
+```bash
+python main.py --dataset soundmap --direction building2soundmap --model glow_improved --use_temperature
+```
 
-<p align="middle">
-  <img src="figs/high_res/single/aachen_000160_000019/segment.png" width="300" />
-  <img src="figs/high_res/single/aachen_000160_000019/sample_9.png" width="300" />
-</p>
+2. Using humidity only:
+```bash
+python main.py --dataset soundmap --direction building2soundmap --model glow_improved --use_humidity
+```
 
-<p align="middle">
-  <img src="figs/high_res/single/jena_000078_000019/segment.png" width="300" />
-  <img src="figs/high_res/single/jena_000078_000019/sample_3.png" width="300" />
-</p>
+3. Using decibel level only:
+```bash
+python main.py --dataset soundmap --direction building2soundmap --model glow_improved --use_db
+```
 
+4. Using multiple conditions:
+```bash
+python main.py --dataset soundmap --direction building2soundmap --model glow_improved --use_temperature --use_humidity --use_db
+```
 
-## Visual examples of content transfer (please zoom to see more details)
-Images from left to right: Desired content - Desired structure - Content applied to structure - Ground-truth for structure
+### Additional Training Parameters
 
-<p align="middle">
-  <img src="figs/content_transfer/example_1/content.png" width="150" />
-  <img src="figs/content_transfer/example_1/structure.png" width="150" />
-  <img src="figs/content_transfer/example_1/result.png" width="150" />
-  <img src="figs/content_transfer/example_1/ground_truth.png" width="150" />
-</p>
+- `--n_flow`: Number of flow steps per block (default: [32, 32, 32, 32])
+- `--n_block`: Number of blocks (default: 4) 
+- `--img_size`: Image dimensions (default: [256, 256])
+- `--batch_size`: Batch size for training (default: 1)
+- `--lr`: Learning rate (default: 1e-4)
+- `--temperature`: Sampling temperature (default: 1.0)
+- `--do_lu`: Enable LU decomposition for invertible 1x1 convolutions
+- `--grad_checkpoint`: Enable gradient checkpointing to reduce memory usage
 
-<p align="middle">
-  <img src="figs/content_transfer/example_2/content.png" width="150" />
-  <img src="figs/content_transfer/example_2/structure.png" width="150" />
-  <img src="figs/content_transfer/example_2/result.png" width="150" />
-  <img src="figs/content_transfer/example_2/ground_truth.png" width="150" />
-</p>
+Recommended:
+```bash
+python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_temperature --use_humidity --use_db
+```
 
-<p align="middle">
-  <img src="figs/content_transfer/example_3/content.png" width="150" />
-  <img src="figs/content_transfer/example_3/structure.png" width="150" />
-  <img src="figs/content_transfer/example_3/result.png" width="150" />
-  <img src="figs/content_transfer/example_3/ground_truth.png" width="150" />
-</p>
+## Model Architecture
 
-## Samples generated on the [maps](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/datasets/download_pix2pix_dataset.sh) dataset
-<pre>Top row: Condition, Bottom row: synthesized </pre>
-<p align="middle">
-  <img src="figs/maps/map.png" />
-   <img src="figs/maps/256x256_map2photo_186000.png" />
-</p>
+The model uses the Full-Glow architecture which extends the original Glow model by making all operations conditional. When environmental conditions are enabled, they are incorporated into the conditioning networks alongside the building layout information.
 
-<pre>Top row: Condition, Bottom row: synthesized </pre>
-<p align="middle">
-  <img src="figs/maps/photo.png" />
-   <img src="figs/maps/512x512_photo2map_108505.png" />
-</p>
-
-
-## Training
-To train a model on e.g. Cityscapes, one can run:  
-`python3 main.py --model improved_so_large_longer --img_size 512 1024 --dataset cityscapes --direction label2photo 
-   --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint`  
-### Arguments
-- `--model` indicates the name of the model (should have 'improved' in the name to enable training Full-Glow)
-- `--dataset` determines which dataset to choose. Dataloaders for the Cityscapes, MNIST, and maps datasets are already implemented here
-- `--do_lu` enables the use of LU decomposition which has a noticeable effect on training time  
-- `--reg_factor` indicates the regularizer applied to the right-hand side of the objective function  
-- `--grad_checkpoint` enables use of [gradient checkpointing](https://github.com/cybertronai/gradient-checkpointing) which is needed here for training on larger images
-
-## Description of packages in the project
-- `data_handler` contains implementation of data loaders for different datasets
-- `evaluation` contains code for evaluating the models
-- `experiments` has code for experiments such as content transfer and sampling
-- `helper` contains implementation of helper functions for dealing with files, directories, saving/loading checkpoints etc.
-- `models` contains implementation of Full-Glow, DUAL-Glow, and C-Glow
-- `trainer` has implementation of the training loop and loss function
-
-## Checkpoints
-Checkpoints for all the Cityscapes models trained in this project (including C-Glow and DUAL-Glow) can be found here: https://kth.box.com/s/h3r9jt5pq8itrnkp0t2qy11pui7u6dmc
-
-
-## Notes
-- My implementation of the baseline Glow borrows heavily from Kim Seonghyeon's helpful implementation: https://github.com/rosinality/glow-pytorch
+Key features:
+- Fully conditional flow-based model
+- Support for multiple environmental conditions
+- Generates 256x256 sound maps
+- Uses LU decomposition for improved stability (when enabled)
+- Gradient checkpointing for memory efficiency
 
 ## Citation
-If you use our code or build on our method, please cite our paper:
+
+If you use this code, please cite both this adaptation and the original Full-Glow paper:
+
 ```
 @inproceedings{sorkhei2021full,
   author={Sorkhei, Moein and Henter, Gustav Eje and Kjellstr{\"o}m, Hedvig},
@@ -138,3 +116,6 @@ If you use our code or build on our method, please cite our paper:
   year={2021}
 }
 ```
+
+## License
+MIT
