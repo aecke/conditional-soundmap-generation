@@ -21,7 +21,7 @@ pip install -r requirements.txt
 
 The model expects the following data structure:
 - Training data CSV containing building-soundmap pairs and environmental conditions
-- Building images (grayscale)
+- Building images
 - Sound map images (256x256 pixels)
 
 Configure the data paths in `params.json`:
@@ -45,6 +45,11 @@ Configure the data paths in `params.json`:
 ```
 
 ## Training Commands
+
+Recommended:
+```bash
+python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_temperature --use_humidity --use_db
+```
 
 ### Basic Training
 Train the model using only building layouts to generate sound maps:
@@ -85,11 +90,6 @@ python main.py --dataset soundmap --direction building2soundmap --model glow_imp
 - `--temperature`: Sampling temperature (default: 1.0)
 - `--do_lu`: Enable LU decomposition for invertible 1x1 convolutions
 - `--grad_checkpoint`: Enable gradient checkpointing to reduce memory usage
-
-Recommended:
-```bash
-python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_temperature --use_humidity --use_db
-```
 
 ## Model Architecture
 
