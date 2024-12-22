@@ -1,0 +1,119 @@
+{
+  "mnist": {
+    "sample_freq": 100,
+    "checkpoint_freq": 1000,
+    "batch_size": 128,
+    "iter": 100000,
+    "n_flow": 32,
+    "n_block": 3,
+    "lu": true,
+    "affine": true,
+    "n_bits": 8,
+    "lr": 1e-4,
+    "temperature": 0.7,
+    "n_samples": 30,
+    "channels": 1,
+    "img_size": [24, 24],
+    "data_folder": "../data/mnist",
+
+    "checkpoints_path": {
+      "conditional": "../checkpoints/mnist/conditional",
+      "unconditional": "../checkpoints/mnist/unconditional"
+    },
+
+    "samples_path": {
+      "conditional": "../samples/mnist/conditional",
+      "unconditional": "../samples/mnist/unconditional"
+    }
+  },
+
+  "cityscapes": {
+    "sample_freq": 500,
+    "checkpoint_freq": 1000,
+    "val_freq": 3000,
+    "iter": 5000000,
+    "n_flow": [32, 32, 32, 32],
+    "n_block": 4,
+    "lu": true,
+    "affine": true,
+    "n_bits": 8,
+    "lr": 1e-4,
+    "temperature": 1.0,
+    "n_samples": 5,
+    "channels": 3,
+    "img_size": [256, 256],
+    "batch_size": 1,
+    "monitor_val": true,
+
+    "data_folder": {
+      "base": "/local_storage/datasets/moein/cityscapes",
+      "segment": "/local_storage/datasets/moein/cityscapes/gtFine_trainvaltest/gtFine",
+      "real": "/local_storage/datasets/moein/cityscapes/leftImg8bit_trainvaltest/leftImg8bit"
+    },
+
+    "tfrecords_file": {
+      "train": "/local_storage/datasets/moein/cityscapes/tfrecords/train.tfrecords",
+      "val": "/local_storage/datasets/moein/cityscapes/tfrecords/val.tfrecords"
+    },
+
+    "samples_path": "/Midgard/home/sorkhei/glow2/samples",
+    "checkpoints_path": "/Midgard/home/sorkhei/glow2/checkpoints"
+  },
+
+  "maps": {
+    "sample_freq": 500,
+    "checkpoint_freq": 1000,
+    "val_freq": 1000,
+    "iter": 500000,
+    "n_flow": [32, 32, 32, 32],
+    "n_block": 4,
+    "lu": true,
+    "affine": true,
+    "n_bits": 8,
+    "lr": 1e-4,
+    "temperature": 1.0,
+    "n_samples": 5,
+    "channels": 3,
+    "img_size": [256, 256],
+    "batch_size": 1,
+    "monitor_val": true,
+
+    "data_folder": "E:/Projekte/CNF_cityspace/src/maps",
+    "samples_path": "E:/Projekte/CNF_cityspace/samples/maps",
+    "checkpoints_path": "E:/Projekte/CNF_cityspace/checkpoints/maps"
+  },
+
+   "soundmap": {
+    "sample_freq": 500,
+    "checkpoint_freq": 1000,
+    "val_freq": 1000,
+    "iter": 1000000,
+    "n_flow": [32, 32, 32, 32], 
+    "n_block": 4,
+    "lu": true,
+    "affine": true,
+    "n_bits": 8,
+    "lr": 1e-4,
+    "temperature": 1.0,
+    "n_samples": 5,
+    "channels": 3,
+    "img_size": [256, 256],
+    "batch_size": 1,
+    "monitor_val": true,
+
+    "data_folder": {
+      "train": {
+          "buildings": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/train/buildings",
+          "soundmaps": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/train/soundmaps/256",
+          "csv_path": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/train.csv"
+      },
+      "test": {
+          "buildings": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/test/buildings",
+          "soundmaps": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/test/soundmaps/256",
+          "csv_path": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/test.csv"
+      }
+    },
+    "samples_path": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/samples",
+    "checkpoints_path": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/Checkpoints"
+  }
+}
