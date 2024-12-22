@@ -152,7 +152,7 @@ def train(
             if (optim_step % params["sample_freq"] == 0) or current_lr == 0:
                 samples_path = paths["samples_path"]
                 helper.make_dir_if_not_exists(samples_path)
-                sampled_images = models.take_samples(args, params, model, reverse_cond, extra_cond)
+                sampled_images = models.take_samples(args, params, model, reverse_cond, batch, n_samples=params['n_samples'])
                 
                 # Dateiname mit numerischen Bedingungen
                 filename = f"{str(optim_step).zfill(6)}"
