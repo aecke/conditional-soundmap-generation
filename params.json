@@ -1,7 +1,7 @@
 {
   "mnist": {
     "sample_freq": 100,
-    "checkpoint_freq": 1000,
+    "checkpoint_freq": 5,
     "batch_size": 128,
     "iter": 100000,
     "n_flow": 32,
@@ -85,7 +85,7 @@
 
    "soundmap": {
     "sample_freq": 500,
-    "checkpoint_freq": 1000,
+    "checkpoint_freq": 25000,
     "val_freq": 1000,
     "iter": 1200000,
     "n_flow": [8,8,8,8], 

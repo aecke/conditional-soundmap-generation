@@ -1,4 +1,6 @@
+import time
 import json
+import sys
 import os
 from datetime import datetime
 import torch
@@ -7,21 +9,33 @@ from helper.paths import compute_paths, make_dir_if_not_exists
 class TrainingLogger:
     def __init__(self, args, params):
         """
-        Initialize the training logger.
+        Initialize training logger focused on comprehensive data collection.
         
         Args:
             args: Command line arguments
             params: Model and training parameters
         """
-        # Get paths from existing path computation
+        # Paths setup
         paths = compute_paths(args, params)
         self.checkpoints_path = paths["checkpoints_path"]
         self.log_dir = os.path.join(self.checkpoints_path, "logs")
         make_dir_if_not_exists(self.log_dir)
         
-        # Create timestamp for unique run identification
+        # Basic info
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.model_name = args.model
+        self.start_time = time.time()
+        self.batch_size = params['batch_size']
+        
+        # Training parameters
+        self.params = params
+        self.args = args
+        
+        # Initialize counters and best values
+        self.best_val_loss = float('inf')
+        self.steps_without_improvement = 0
+        self.total_training_steps = 0
+        self.nan_inf_counts = 0
         
         # Extra Conditions Configuration
         self.use_extra_cond = any([
@@ -36,126 +50,188 @@ class TrainingLogger:
             self.active_conditions.append("humidity")
         if args.use_db:
             self.active_conditions.append("db")
-        
-        # Initialize metrics tracking
-        self.metrics = {
-            'train_loss': [],
-            'val_loss': [],
-            'loss_left': [],
-            'loss_right': [], 
-            'learning_rate': [],
-            'iteration': [],
-            'iteration_time': [],
-            'memory_usage': [],
-        }
-        
-        # Initialize log files using existing path structure
-        self.log_file = os.path.join(self.log_dir, f'training_log_{self.timestamp}.json')
+
+        # Initialize log files with clear suffixes
+        self.log_file = os.path.join(self.log_dir, f'training_metrics_{self.timestamp}.jsonl')
+        self.val_file = os.path.join(self.log_dir, f'validation_metrics_{self.timestamp}.jsonl')
         self.summary_file = os.path.join(self.log_dir, f'training_summary_{self.timestamp}.txt')
+        self.system_metrics_file = os.path.join(self.log_dir, f'system_metrics_{self.timestamp}.jsonl')
+        self.config_file = os.path.join(self.log_dir, f'experiment_config_{self.timestamp}.json')
         
         # Log initial configuration
-        self.log_hyperparameters(args, params)
+        self._log_hyperparameters()
 
-    def log_hyperparameters(self, args, params):
-        """
-        Log training hyperparameters and initial configuration.
-        
-        Args:
-            args: Command line arguments containing training configuration
-            params: Model parameters and settings
-        """
+    def _log_hyperparameters(self):
+        """Log complete experiment configuration and setup."""
         hyperparameters = {
-            'model_name': self.model_name,
             'timestamp': self.timestamp,
-            'args': vars(args),
-            'params': params,
-            'device': str(torch.cuda.get_device_name(0)) if torch.cuda.is_available() else 'cpu',
+            'model_configuration': {
+                'model_name': self.model_name,
+                'n_flow': self.params['n_flow'],
+                'n_block': self.params['n_block'],
+                'img_size': self.params['img_size'],
+                'channels': self.params['channels'],
+                'batch_size': self.batch_size,
+                'learning_rate': self.params['lr'],
+                'temperature': self.params['temperature']
+            },
+            'training_configuration': {
+                'direction': self.args.direction,
+                'dataset': self.args.dataset,
+                'reg_factor': self.args.reg_factor,
+                'grad_checkpoint': self.args.grad_checkpoint,
+                'do_lu': self.args.do_lu,
+                'max_iterations': self.params['iter'],
+                'checkpoint_freq': self.params['checkpoint_freq'],
+                'sample_freq': self.params['sample_freq'],
+                'val_freq': self.params['val_freq']
+            },
             'extra_conditioning': {
                 'enabled': self.use_extra_cond,
                 'active_conditions': self.active_conditions
+            },
+            'system_info': {
+                'device': str(torch.cuda.get_device_name(0)) if torch.cuda.is_available() else 'cpu',
+                'torch_version': torch.__version__,
+                'cuda_version': torch.version.cuda if torch.cuda.is_available() else None,
+                'python_version': sys.version,
+            },
+            'data_paths': {
+                'checkpoints': self.checkpoints_path,
+                'logs': self.log_dir,
+                'samples': self.params['samples_path']
             }
         }
         
-        with open(self.log_file, 'w') as f:
-            json.dump({'hyperparameters': hyperparameters}, f, indent=4)
+        with open(self.config_file, 'w') as f:
+            json.dump(hyperparameters, f, indent=4)
 
-    def log_iteration(self, optim_step, metrics, time_taken):
-        """
-        Log metrics for a single training iteration.
+    def log_iteration(self, optim_step, metrics, iteration_time):
+        """Log comprehensive metrics for each iteration."""
+        self.total_training_steps += 1
         
-        Args:
-            optim_step (int): Current optimization step
-            metrics (dict): Dictionary containing current metrics
-            time_taken (float): Time taken for iteration
-        """
+        # System metrics
         memory = torch.cuda.memory_allocated()/1e9 if torch.cuda.is_available() else 0
+        memory_reserved = torch.cuda.memory_reserved()/1e9 if torch.cuda.is_available() else 0
         
-        # Update internal metrics tracking
-        self.metrics['iteration'].append(optim_step)
-        self.metrics['train_loss'].append(metrics.get('loss', None))
-        self.metrics['val_loss'].append(metrics.get('val_loss', None))
-        self.metrics['loss_left'].append(metrics.get('loss_left', None))
-        self.metrics['loss_right'].append(metrics.get('loss_right', None))
-        self.metrics['learning_rate'].append(metrics.get('learning_rate', None))
-        self.metrics['iteration_time'].append(time_taken)
-        self.metrics['memory_usage'].append(memory)
-
-        # Create comprehensive log entry
-        log_entry = {
+        # Check for NaN/Inf values
+        if any(torch.isnan(torch.tensor([v])) if v is not None else False for v in metrics.values()):
+            self.nan_inf_counts += 1
+        
+        # Training metrics with timestamp
+        training_entry = {
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             'iteration': optim_step,
-            'metrics': metrics,
-            'time_taken': time_taken,
-            'memory_used': memory,
-            'extra_cond_info': {
+            'epoch_approx': optim_step // self.batch_size,
+            'train_metrics': {
+                'loss': metrics.get('loss'),
+                'loss_left': metrics.get('loss_left'),
+                'loss_right': metrics.get('loss_right'),
+                'learning_rate': metrics.get('learning_rate'),
+            },
+            'validation_metrics': {
+                'val_loss': metrics.get('val_loss'),
+                'steps_without_improvement': self.steps_without_improvement,
+                'best_val_loss': self.best_val_loss
+            } if 'val_loss' in metrics else None,
+            'extra_conditions': {
                 'enabled': self.use_extra_cond,
-                'conditions': self.active_conditions
+                'active': self.active_conditions
+            } if self.use_extra_cond else None
+        }
+
+        # System metrics in separate file
+        system_entry = {
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'iteration': optim_step,
+            'system_metrics': {
+                'iteration_time': iteration_time,
+                'memory_allocated_gb': float(memory),
+                'memory_reserved_gb': float(memory_reserved),
+                'memory_peaked_gb': float(torch.cuda.max_memory_allocated()/1e9) if torch.cuda.is_available() else 0,
+                'cuda_memory_allocated_bytes': int(torch.cuda.memory_allocated()),
+                'cuda_max_memory_allocated_bytes': int(torch.cuda.max_memory_allocated()),
+                'cuda_memory_cached_bytes': int(torch.cuda.memory_reserved())
+            }
+        }
+        
+        # Write to respective log files
+        with open(self.log_file, 'a') as f:
+            f.write(json.dumps(training_entry) + '\n')
+            
+        with open(self.system_metrics_file, 'a') as f:
+            f.write(json.dumps(system_entry) + '\n')
+
+    def log_validation(self, val_metrics, iteration):
+        """Log detailed validation metrics and track improvement."""
+        current_val_loss = val_metrics.get('val_loss')
+        
+        # Update best validation loss and steps without improvement
+        if current_val_loss is not None:
+            if current_val_loss < self.best_val_loss:
+                self.best_val_loss = current_val_loss
+                self.steps_without_improvement = 0
+            else:
+                self.steps_without_improvement += 1
+
+        validation_entry = {
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'iteration': iteration,
+            'epoch_approx': iteration // self.batch_size,
+            'validation_metrics': {
+                'val_loss': current_val_loss,
+                'val_loss_left': val_metrics.get('val_loss_left'),
+                'val_loss_right': val_metrics.get('val_loss_right'),
+                'best_val_loss_so_far': self.best_val_loss,
+                'steps_without_improvement': self.steps_without_improvement
+            },
+            'extra_conditions': {
+                'enabled': self.use_extra_cond,
+                'active': self.active_conditions
             } if self.use_extra_cond else None
         }
         
-        # Append to log file
-        with open(self.log_file, 'a') as f:
-            f.write(json.dumps(log_entry) + '\n')
+        with open(self.val_file, 'a') as f:
+            f.write(json.dumps(validation_entry) + '\n')
 
     def write_summary(self):
-        """Write a summary of the training run including best metrics and configuration."""
-        best_metrics = self.get_best_metrics()
-        avg_iteration_time = sum(self.metrics['iteration_time']) / len(self.metrics['iteration_time'])
+        """Write final training summary with comprehensive statistics."""
+        duration = time.time() - self.start_time
         
         summary = f"""Training Summary
 =================
 Model: {self.model_name}
 Run timestamp: {self.timestamp}
-Total iterations: {len(self.metrics['iteration'])}
+
+Training Statistics:
+- Total training time: {duration/3600:.2f} hours
+- Total training steps: {self.total_training_steps}
+- Best validation loss: {self.best_val_loss:.6f}
+- Final steps without improvement: {self.steps_without_improvement}
+- NaN/Inf occurrences: {self.nan_inf_counts}
 
 Extra Conditioning:
 - Enabled: {self.use_extra_cond}
 - Active conditions: {', '.join(self.active_conditions) if self.active_conditions else 'None'}
 
-Best Metrics:
-- Best training loss: {best_metrics['best_train_loss']:.6f}
-- Best validation loss: {best_metrics['best_val_loss']:.6f}
-- Best left loss: {best_metrics['best_loss_left']:.6f}
-- Best right loss: {best_metrics['best_loss_right']:.6f}
+Training Configuration:
+- Batch size: {self.batch_size}
+- Learning rate: {self.params['lr']}
+- Model blocks: {self.params['n_block']}
+- Flow steps: {self.params['n_flow']}
+- Image size: {self.params['img_size']}
+- Direction: {self.args.direction}
+- Dataset: {self.args.dataset}
 
-Final Metrics:
-- Final training loss: {best_metrics['final_train_loss']:.6f}
-- Final validation loss: {best_metrics['final_val_loss']:.6f}
+Log Files (JSONL format):
+- Training metrics: {self.log_file}
+- Validation metrics: {self.val_file}
+- System metrics: {self.system_metrics_file}
+- Full configuration: {self.config_file}
 
-Performance:
-- Average iteration time: {avg_iteration_time:.3f}s
-- Peak memory usage: {max(self.metrics['memory_usage']):.2f}GB
+Note: All metrics are stored in JSONL format for easy post-processing and visualization.
+Each log entry contains detailed timestamps and comprehensive metrics.
 """
         
         with open(self.summary_file, 'w') as f:
             f.write(summary)
-
-    def get_best_metrics(self):
-        """Return dictionary of best metrics achieved during training."""
-        return {
-            'best_train_loss': min(x for x in self.metrics['train_loss'] if x is not None),
-            'best_val_loss': min(x for x in self.metrics['val_loss'] if x is not None),
-            'best_loss_left': min(x for x in self.metrics['loss_left'] if x is not None),
-            'best_loss_right': min(x for x in self.metrics['loss_right'] if x is not None),
-            'final_train_loss': next(x for x in reversed(self.metrics['train_loss']) if x is not None),
-            'final_val_loss': next(x for x in reversed(self.metrics['val_loss']) if x is not None)
-        }

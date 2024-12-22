@@ -43,7 +43,19 @@ def label_to_tensor(label, height, width, count=0):
     return torch.from_numpy(arr.astype(np.float32))
 
 
-def save_checkpoint(path_to_save, optim_step, model, optimizer, loss, lr):
+def save_checkpoint(path_to_save, optim_step, model, optimizer, loss, lr, additional_info=None):
+    """
+    Save a model checkpoint including state dicts, current loss, learning rate and additional info.
+    
+    Args:
+        path_to_save: Directory to save the checkpoint
+        optim_step: Current optimization step
+        model: The model to save
+        optimizer: The optimizer to save
+        loss: Current loss value
+        lr: Current learning rate
+        additional_info: Optional dict containing additional information to save
+    """
     name = path_to_save + f"/optim_step={optim_step}.pt"
     checkpoint = {
         "loss": loss,
@@ -51,12 +63,26 @@ def save_checkpoint(path_to_save, optim_step, model, optimizer, loss, lr):
         "model_state_dict": model.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
     }
+    
+    # Add additional info if provided
+    if additional_info is not None:
+        checkpoint.update(additional_info)
 
     torch.save(checkpoint, name)
     print(f'In [save_checkpoint]: save state dict done at: "{name}"')
 
 
 def load_checkpoint(path_to_load, optim_step, model, optimizer, resume_train=True):
+    """
+    Load a model checkpoint including state dicts, loss, learning rate and any additional info.
+    
+    Args:
+        path_to_load: Directory to load the checkpoint from
+        optim_step: Optimization step to load
+        model: The model to load into
+        optimizer: The optimizer to load into
+        resume_train: Whether to put model in train mode
+    """
     name = path_to_load + f"/optim_step={optim_step}.pt"
     checkpoint = torch.load(name, map_location=device)
 
@@ -66,25 +92,25 @@ def load_checkpoint(path_to_load, optim_step, model, optimizer, resume_train=Tru
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
     loss = checkpoint["loss"]
-    lr = (
-        checkpoint["lr"] if "lr" in checkpoint.keys() else None
-    )  # backward compatibility for checkpoints that do not store lr
+    lr = checkpoint.get("lr", None)  # backward compatibility
+    
+    # Extract any additional info if present
+    additional_info = {k: v for k, v in checkpoint.items() 
+                      if k not in ["model_state_dict", "optimizer_state_dict", "loss", "lr"]}
 
     print(f'In [load_checkpoint]: load state dict done from: "{name}"')
 
-    # putting the model in the correct mode
+    # Set model mode
     if resume_train:
         model.train()
     else:
         model.eval()
-        for (
-            param
-        ) in model.parameters():  # freezing the layers when using only for evaluation
+        for param in model.parameters():
             param.requires_grad = False
 
     if optimizer is not None:
-        return model.to(device), optimizer, loss, lr
-    return model.to(device), None, loss, lr
+        return model.to(device), optimizer, loss, lr, additional_info
+    return model.to(device), None, loss, lr, additional_info
 
 
 def show_memory_usage():
