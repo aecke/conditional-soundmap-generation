@@ -21,7 +21,7 @@ def adjust_lr(current_lr, initial_lr, step, epoch_steps):
     curr_epoch = math.ceil(
         step / epoch_steps
     )  # epoch_steps is the number of steps to complete an epoch
-    threshold = 5  # linearly decay after threshold
+    threshold = 50  # linearly decay after threshold
     if curr_epoch > threshold:
         extra_epochs = curr_epoch - threshold
         decay = initial_lr * (extra_epochs / threshold)

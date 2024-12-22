@@ -117,11 +117,21 @@ def init_model_configs(args):
 
         if args.use_bmaps and args.do_ceil:
             right_configs['condition'] = 'left + b_maps_ceil'
-            
-    right_configs.update({
-        'use_temperature': args.use_temperature,
-        'use_humidity': args.use_humidity
-    })
+
+    # Numerische Bedingungen nur hinzufügen wenn das Dataset soundmap ist
+    if args.dataset == 'soundmap':
+        n_numerical_conditions = sum([
+            getattr(args, 'use_temperature', False),
+            getattr(args, 'use_humidity', False),
+            getattr(args, 'use_db', False)
+        ])
+        right_configs['n_numerical_conditions'] = n_numerical_conditions
+        
+        right_configs.update({
+            'use_temperature': getattr(args, 'use_temperature', False),
+            'use_humidity': getattr(args, 'use_humidity', False),
+            'use_db': getattr(args, 'use_db', False)
+        })
 
     print(f'In [init_configs]: configs init done: \nleft_configs: {left_configs} \nright_configs: {right_configs}\n')
     return left_configs, right_configs

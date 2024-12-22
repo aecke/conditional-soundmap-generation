@@ -26,9 +26,16 @@ def retrieve_rev_cond(args, params, run_mode='train'):
             
             for building_name in soundmap_test_buildings:
                 path = os.path.join(test_folder, building_name)
-                img = transform(Image.open(path))  # transform statt direkt Compose
-                test_buildings.append(img)
+                if os.path.exists(path):
+                    img = transform(Image.open(path))
+                    test_buildings.append(img)
+                else:
+                    print(f"Warning: Building file not found: {path}")
+                    continue
             
+            if not test_buildings:
+                raise RuntimeError("No test buildings could be loaded!")
+                
             test_buildings = torch.stack(test_buildings).to(device)
             return test_buildings
     else:

@@ -46,7 +46,7 @@ def read_params_and_args():
     parser.add_argument("--max_step", type=int)
     parser.add_argument("--n_samples", type=int)
     
-    #temp and humidity
+    #temp, dband humidity
     parser.add_argument("--use_temperature", action="store_true")
     parser.add_argument("--use_humidity", action="store_true")
     parser.add_argument("--use_db", action="store_true")
