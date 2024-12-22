@@ -93,7 +93,7 @@ def extract_batches(batch, args):
     # Numerische Bedingungen nur extrahieren wenn die Flags gesetzt sind
     if any([args.use_temperature, args.use_humidity, args.use_db]):
         if 'extra_cond' not in batch:
-            print("Warning: Numerical conditions flags are set but no numerical data found in batch")
+            print("Warning: extra_cond conditions flags are set but no extra_cond data found in batch")
         else:
             extra_cond = batch['extra_cond'].to(device)
     

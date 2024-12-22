@@ -757,7 +757,7 @@ def gaussian_diag(mean, logsd):
 #     Args:
 #       mat: Matrix to take the square root of.
 #       eps: Small epsilon such that any element less than eps will not be square
-#         rooted to guard against numerical instability.
+#         rooted to guard against extra_cond instability.
 #     Returns:
 #       Matrix square root of mat.
 #     """

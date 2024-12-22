@@ -9,7 +9,7 @@ import os
 import glob
 
 class SoundMapDataset(data.Dataset):
-    SCALER_FILENAME = 'numerical_scaler.save'
+    SCALER_FILENAME = 'extra_cond_scaler.save'
     # test
     def __init__(self, data_folder, is_train=True, img_size=(256, 256), 
                  use_temperature=False, use_humidity=False, use_db=False):
@@ -42,33 +42,33 @@ class SoundMapDataset(data.Dataset):
                 raise ValueError(f"Invalid db value format: {e}")
         
         # Liste der zu normalisierenden Spalten erstellen
-        self.numerical_cols = []
+        self.extra_cond_cols = []
         if self.use_db:
-            self.numerical_cols.append('db_value')
+            self.extra_cond_cols.append('db_value')
         if self.use_temperature:
-            self.numerical_cols.append('temperature')
+            self.extra_cond_cols.append('temperature')
         if self.use_humidity:
-            self.numerical_cols.append('humidity')
+            self.extra_cond_cols.append('humidity')
             
         # Scaler initialisieren und anwenden wenn numerische Features verwendet werden
-        if self.numerical_cols and is_train:
+        if self.extra_cond_cols and is_train:
             self.scaler = MinMaxScaler()
-            self.data[self.numerical_cols] = self.scaler.fit_transform(self.data[self.numerical_cols])
+            self.data[self.extra_cond_cols] = self.scaler.fit_transform(self.data[self.extra_cond_cols])
             # Speichere Scaler für Testset
             joblib.dump(self.scaler, self.scaler_path)
             
-            print(f"Using numerical conditions: {', '.join(self.numerical_cols)}")
+            print(f"Using extra_cond conditions: {', '.join(self.extra_cond_cols)}")
             print(f"Fitted scaler saved to: {self.scaler_path}")
-            print("Numerical ranges after scaling:")
-            for col in self.numerical_cols:
+            print("extra_cond ranges after scaling:")
+            for col in self.extra_cond_cols:
                 min_val = self.data[col].min()
                 max_val = self.data[col].max()
                 print(f"  {col}: [{min_val:.3f}, {max_val:.3f}]")
                 
-        elif self.numerical_cols:
+        elif self.extra_cond_cols:
             # Lade gespeicherten Scaler für Testset
             self.scaler = joblib.load(self.scaler_path)
-            self.data[self.numerical_cols] = self.scaler.transform(self.data[self.numerical_cols])
+            self.data[self.extra_cond_cols] = self.scaler.transform(self.data[self.extra_cond_cols])
             
         print(f"Found {len(self.data)} entries in {'train' if is_train else 'test'} set")
 
@@ -113,21 +113,21 @@ class SoundMapDataset(data.Dataset):
         }
 
         # Numerische Bedingungen sammeln (bereits normalisiert)
-        if self.numerical_cols:
+        if self.extra_cond_cols:
             try:
                 extra_cond = []
-                for col in self.numerical_cols:
+                for col in self.extra_cond_cols:
                     if pd.isna(row[col]):
                         raise ValueError(f"Missing value for {col} in row {idx}")
                     extra_cond.append(float(row[col]))  # Ensure float values
                     
                 # Create tensor with explicit shape
                 extra_cond = torch.tensor(extra_cond, dtype=torch.float32)
-                print(f"Dataset numerical conditions shape: {extra_cond.shape}")  # Should be (n_features,)
+                print(f"Dataset extra_cond conditions shape: {extra_cond.shape}")  # Should be (n_features,)
                 result['extra_cond'] = extra_cond
                 
             except Exception as e:
-                print(f"Error processing numerical conditions for row {idx}: {e}")
-                print(f"Problematic row data: {row[self.numerical_cols]}")
+                print(f"Error processing extra_cond conditions for row {idx}: {e}")
+                print(f"Problematic row data: {row[self.extra_cond_cols]}")
                 raise
         return result

@@ -263,11 +263,11 @@ class CouplingCondNet(nn.Module):
         conv_out = self.conv_net(cond_input)
         return conv_out
 
-class NumericalCondNet(nn.Module):
+class ExtraCondNet(nn.Module):
     def __init__(self, n_features, hidden_dim=64, output_dim=32):
         """
         Args:
-            n_features: Anzahl der numerischen Features (z.B. 3 für temp,humidity,db)
+            n_features: Anzahl der Extra-Conditions (z.B. 3 für temp,humidity,db)
             hidden_dim: Größe der versteckten Schicht
             output_dim: Dimension des Output-Embeddings
         """

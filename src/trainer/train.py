@@ -49,7 +49,7 @@ def train(
     # Initialize training logger
     training_logger = TrainingLogger(args, params)
     
-    # Log numerical conditions configuration
+    # Log extra_cond conditions configuration
     if any([args.use_temperature, args.use_humidity, args.use_db]):
         extra_cond = []
         if args.use_temperature:
@@ -58,7 +58,7 @@ def train(
             extra_cond.append('humidity') 
         if args.use_db:
             extra_cond.append('db')
-        print(f"Training with numerical conditions: {', '.join(extra_cond)}")
+        print(f"Training with extra_cond conditions: {', '.join(extra_cond)}")
 
     # adjusting optim step
     optim_step = last_optim_step + 1 if resume else 1
@@ -133,7 +133,7 @@ def train(
                 
                 # Log welche numerischen Bedingungen verwendet wurden
                 if any([args.use_temperature, args.use_humidity, args.use_db]):
-                    print("Validation includes numerical conditions:", 
+                    print("Validation includes extra_cond conditions:", 
                           "temperature" if args.use_temperature else "",
                           "humidity" if args.use_humidity else "",
                           "db" if args.use_db else "")
