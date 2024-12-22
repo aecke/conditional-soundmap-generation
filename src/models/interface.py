@@ -9,7 +9,7 @@ import data_handler
 import helper
 
 
-def take_samples(args, params, model, reverse_cond, n_samples=None):
+def take_samples(args, params, model, reverse_cond, n_samples=None, batch):
     with torch.no_grad():
         if 'c_glow' in args.model:
             temp = params['temperature']
