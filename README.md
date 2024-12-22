@@ -21,7 +21,7 @@ pip install -r requirements.txt
 
 The model expects the following data structure:
 - Training data CSV containing building-soundmap pairs and environmental conditions
-- Building images (grayscale)
+- Building images
 - Sound map images (256x256 pixels)
 
 Configure the data paths in `params.json`:
