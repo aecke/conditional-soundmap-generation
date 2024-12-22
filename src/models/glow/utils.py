@@ -110,7 +110,7 @@ def sanity_check(x_a_ref, x_b_ref, x_a_rec, x_b_rec):
     print(f'In [sanity_check]: mean x_a_diff: {x_a_diff} ===> {ok_or_not_a}')
     print(f'In [sanity_check]: mean x_b_diff: {x_b_diff} ===> {ok_or_not_b}')
     print('=' * 100, '\n')
-
+    
 def calc_cond_shapes_with_numerical(n_channels, image_size, n_blocks, split_type, condition, numerical_dim):
     """Berechnet die Condition-Shapes unter Berücksichtigung zusätzlicher numerischer Features"""
     base_shapes = calc_cond_shapes(n_channels, image_size, n_blocks, split_type, condition)

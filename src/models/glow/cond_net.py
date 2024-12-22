@@ -279,5 +279,15 @@ class NumericalCondNet(nn.Module):
         )
         
     def forward(self, x):
-        # x hat Shape (batch_size, n_features)
-        return self.net(x)  # Output Shape: (batch_size, output_dim)
+        # Debug prints
+        print(f"Input shape: {x.shape}")  # Should be (batch_size, n_features)
+        
+        # Ensure input is 2D: (batch_size, n_features)
+        if len(x.shape) == 1:
+            x = x.unsqueeze(0)  # Add batch dimension if missing
+            
+        # Run through network
+        out = self.net(x)
+        print(f"Output shape: {out.shape}")  # Should be (batch_size, output_dim)
+        
+        return out

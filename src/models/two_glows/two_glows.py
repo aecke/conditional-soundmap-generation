@@ -79,7 +79,15 @@ class TwoGlows(nn.Module):
         # Verarbeite numerische Conditions wenn vorhanden
         numerical_features = None
         if self.has_numerical and extra_cond is not None:
-            numerical_features = self.numerical_net(extra_cond)  # Shape: (batch_size, numerical_output_dim)
+            # Debug print
+            print(f"Extra cond shape before numerical net: {extra_cond.shape}")
+            
+            # Ensure extra_cond has correct shape
+            if len(extra_cond.shape) == 1:
+                extra_cond = extra_cond.unsqueeze(0)  # Add batch dimension
+                
+            numerical_features = self.numerical_net(extra_cond)  
+            print(f"Numerical features shape after net: {numerical_features.shape}")
 
         # Für jeden Block und Flow die Bedingungen vorbereiten
         for block_idx in range(len(act_cond)):
@@ -88,12 +96,20 @@ class TwoGlows(nn.Module):
                 batch_size, _, height, width = base_features.shape
                 
                 if numerical_features is not None:
+                    # Ensure numerical_features matches batch size
+                    if numerical_features.size(0) != batch_size:
+                        numerical_features = numerical_features.expand(batch_size, -1)
+                    
                     # Erweitere numerische Features auf räumliche Dimensionen
                     num_features = numerical_features.unsqueeze(-1).unsqueeze(-1)
                     num_features = num_features.expand(-1, -1, height, width)
                     
+                    print(f"Base features shape: {base_features.shape}")
+                    print(f"Numerical features expanded shape: {num_features.shape}")
+                    
                     # Konkateniere Features
                     combined_features = torch.cat([base_features, num_features], dim=1)
+                    print(f"Combined features shape: {combined_features.shape}")
                 else:
                     combined_features = base_features
 
@@ -121,12 +137,8 @@ class TwoGlows(nn.Module):
         # perform left glow forward
         left_glow_out = self.left_glow(x_a)
 
-        # Verarbeite numerische Bedingungen wenn vorhanden
-        if hasattr(self, 'numerical_net') and extra_cond is not None:
-            numerical_features = self.numerical_net(extra_cond)
-            conditions = self.prep_conds(left_glow_out, numerical_features, direction='forward')
-        else:
-            conditions = self.prep_conds(left_glow_out, extra_cond, direction='forward')
+       
+        conditions = self.prep_conds(left_glow_out, extra_cond, direction='forward')
 
         # perform right glow forward
         right_glow_out = self.right_glow(x_b, conditions)
