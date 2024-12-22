@@ -48,6 +48,17 @@ def train(
 
     # Initialize training logger
     training_logger = TrainingLogger(args, params)
+    
+    # Log numerical conditions configuration
+    if any([args.use_temperature, args.use_humidity, args.use_db]):
+        numerical_conditions = []
+        if args.use_temperature:
+            numerical_conditions.append('temperature')
+        if args.use_humidity:
+            numerical_conditions.append('humidity') 
+        if args.use_db:
+            numerical_conditions.append('db')
+        print(f"Training with numerical conditions: {', '.join(numerical_conditions)}")
 
     # adjusting optim step
     optim_step = last_optim_step + 1 if resume else 1
@@ -80,11 +91,11 @@ def train(
 
             begin_time = time.time()
             # forward pass
-            left_batch, right_batch, extra_cond_batch = data_handler.extract_batches(
+            left_batch, right_batch, numerical_conditions = data_handler.extract_batches(
                 batch, args
             )
             forward_output = forward_and_loss(
-                args, params, model, left_batch, right_batch, extra_cond_batch
+                args, params, model, left_batch, right_batch, numerical_conditions
             )
 
             # regularize left loss
@@ -119,6 +130,13 @@ def train(
                 val_loss_mean, _ = calc_val_loss(args, params, model, val_loader)
                 metrics["val_loss"] = val_loss_mean
                 print(f"====== In [train]: val_loss mean: {round(val_loss_mean, 3)}")
+                
+                # Log welche numerischen Bedingungen verwendet wurden
+                if any([args.use_temperature, args.use_humidity, args.use_db]):
+                    print("Validation includes numerical conditions:", 
+                          "temperature" if args.use_temperature else "",
+                          "humidity" if args.use_humidity else "",
+                          "db" if args.use_db else "")
 
             # Log training metrics
             end_time = time.time()
@@ -135,9 +153,23 @@ def train(
                 samples_path = paths["samples_path"]
                 helper.make_dir_if_not_exists(samples_path)
                 sampled_images = models.take_samples(args, params, model, reverse_cond)
+                
+                # Dateiname mit numerischen Bedingungen
+                filename = f"{str(optim_step).zfill(6)}"
+                if any([args.use_temperature, args.use_humidity, args.use_db]):
+                    conds = []
+                    if args.use_temperature:
+                        conds.append("temp")
+                    if args.use_humidity:
+                        conds.append("hum")
+                    if args.use_db:
+                        conds.append("db")
+                    filename += f"_{'_'.join(conds)}"
+                filename += ".png"
+                
                 utils.save_image(
                     sampled_images,
-                    f"{samples_path}/{str(optim_step).zfill(6)}.png",
+                    f"{samples_path}/{filename}",
                     nrow=10,
                 )
                 print(
@@ -150,8 +182,19 @@ def train(
             ) or current_lr == 0:
                 checkpoints_path = paths["checkpoints_path"]
                 helper.make_dir_if_not_exists(checkpoints_path)
+                
+                # Speichere auch die numerischen Bedingungen
+                additional_info = {
+                    'numerical_conditions': {
+                        'temperature': args.use_temperature,
+                        'humidity': args.use_humidity,
+                        'db': args.use_db
+                    }
+                }
+                
                 helper.save_checkpoint(
-                    checkpoints_path, optim_step, model, optimizer, loss, current_lr
+                    checkpoints_path, optim_step, model, optimizer, loss, current_lr,
+                    additional_info=additional_info
                 )
                 print("In [train]: Checkpoint saved at iteration", optim_step, "\n")
 

@@ -43,7 +43,7 @@ class TwoGlows(nn.Module):
         if n_numerical > 0:
             self.numerical_net = NumericalCondNet(n_numerical)
 
-    def prep_conds(self, left_glow_out, extra_cond, direction):
+    def prep_conds(self, left_glow_out, numerical_conditions, direction):
         act_cond = left_glow_out['all_act_outs']
         w_cond = left_glow_out['all_w_outs']
         coupling_cond = left_glow_out['all_flows_outs']
@@ -58,8 +58,8 @@ class TwoGlows(nn.Module):
                 # sind bereits in act_cond enthalten
                 
                 # 2. Numerische Bedingungen hinzufügen falls vorhanden
-                if hasattr(self, 'numerical_net') and isinstance(extra_cond, torch.Tensor) and len(extra_cond.shape) == 2:
-                    num_features = extra_cond.unsqueeze(-1).unsqueeze(-1)
+                if hasattr(self, 'numerical_net') and isinstance(numerical_conditions, torch.Tensor) and len(numerical_conditions.shape) == 2:
+                    num_features = numerical_conditions.unsqueeze(-1).unsqueeze(-1)
                     num_features = num_features.expand(-1, -1, cond_h, cond_w)
                     combined_features.append(num_features)
 
@@ -80,16 +80,16 @@ class TwoGlows(nn.Module):
         
         return conditions
 
-    def forward(self, x_a, x_b, extra_cond=None):  # x_a: building, extra_cond: numerical conditions
+    def forward(self, x_a, x_b, numerical_conditions=None):  # x_a: building, numerical_conditions: numerical conditions
         # perform left glow forward
         left_glow_out = self.left_glow(x_a)
 
         # Verarbeite numerische Bedingungen wenn vorhanden
-        if hasattr(self, 'numerical_net') and extra_cond is not None:
-            numerical_features = self.numerical_net(extra_cond)
+        if hasattr(self, 'numerical_net') and numerical_conditions is not None:
+            numerical_features = self.numerical_net(numerical_conditions)
             conditions = self.prep_conds(left_glow_out, numerical_features, direction='forward')
         else:
-            conditions = self.prep_conds(left_glow_out, extra_cond, direction='forward')
+            conditions = self.prep_conds(left_glow_out, numerical_conditions, direction='forward')
 
         # perform right glow forward
         right_glow_out = self.right_glow(x_b, conditions)
@@ -113,10 +113,10 @@ class TwoGlows(nn.Module):
 
         return left_glow_outs, right_glow_outs
 
-    def reverse(self, x_a=None, z_b_samples=None, extra_cond=None, reconstruct=False, numerical_conditions=None):
+    def reverse(self, x_a=None, z_b_samples=None, numerical_conditions=None, reconstruct=False, numerical_conditions=None):
         print(f"TwoGlows reverse input shapes: x_a={x_a.shape if x_a is not None else None}, z_b_samples={z_b_samples[0].shape if z_b_samples else None}")
         left_glow_out = self.left_glow(x_a)  # left glow forward always needed before preparing conditions
-        conditions = self.prep_conds(left_glow_out, extra_cond, direction='reverse')
+        conditions = self.prep_conds(left_glow_out, numerical_conditions, direction='reverse')
         x_b_syn = self.right_glow.reverse(z_b_samples, reconstruct=reconstruct, conditions=conditions)  # sample x_b conditioned on x_a
         return x_b_syn
 

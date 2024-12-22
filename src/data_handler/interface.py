@@ -91,7 +91,7 @@ def extract_batches(batch, args):
         numerical_conditions = None
         
         # Numerische Bedingungen extrahieren falls vorhanden
-        if 'numerical_conditions' in batch:
+        if any([args.use_temperature, args.use_humidity, args.use_db]):
             numerical_conditions = batch['numerical_conditions'].to(device)
         
         if args.direction == 'building2soundmap':
