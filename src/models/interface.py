@@ -37,7 +37,8 @@ def take_samples(args, params, model, reverse_cond, n_samples=None):
             if args.direction == 'building2soundmap':
                 sampled_images = model.reverse(
                     x_a=reverse_cond,  # Jetzt mit korrekter Batch-Size
-                    z_b_samples=z_samples
+                    z_b_samples=z_samples.
+                    numerical_conditions=batch['numerical_conditions']
                 ).cpu().data
 
         else:

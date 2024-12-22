@@ -43,46 +43,58 @@ class TwoGlows(nn.Module):
         if n_numerical > 0:
             self.numerical_net = NumericalCondNet(n_numerical)
 
-    def prep_conds(self, left_glow_out, b_map, direction):
+    def prep_conds(self, left_glow_out, extra_cond, direction):
         act_cond = left_glow_out['all_act_outs']
-        w_cond = left_glow_out['all_w_outs']  # left_glow_out in the forward direction
+        w_cond = left_glow_out['all_w_outs']
         coupling_cond = left_glow_out['all_flows_outs']
 
-        # important: prep_conds will change the values of left_glow_out, so left_glow_out is not valid after this function
-        cond_config = self.right_configs['condition']
-        if 'b_maps' in cond_config:
-            for block_idx in range(len(act_cond)):
-                for flow_idx in range(len(act_cond[block_idx])):
-                    cond_h, cond_w = act_cond[block_idx][flow_idx].shape[2:]
-                    do_ceil = 'ceil' in cond_config
+        # Für jeden Block und Flow die Bedingungen vorbereiten
+        for block_idx in range(len(act_cond)):
+            for flow_idx in range(len(act_cond[block_idx])):
+                cond_h, cond_w = act_cond[block_idx][flow_idx].shape[2:]
+                combined_features = [act_cond[block_idx][flow_idx]]  # Start mit Bild-Features
+                
+                # 1. Building Features sind immer dabei
+                # sind bereits in act_cond enthalten
+                
+                # 2. Numerische Bedingungen hinzufügen falls vorhanden
+                if hasattr(self, 'numerical_net') and isinstance(extra_cond, torch.Tensor) and len(extra_cond.shape) == 2:
+                    num_features = extra_cond.unsqueeze(-1).unsqueeze(-1)
+                    num_features = num_features.expand(-1, -1, cond_h, cond_w)
+                    combined_features.append(num_features)
 
-                    # helper.print_and_wait(f'b_map size: {b_map.shape}')
-                    # b_map_cond = helper.resize_tensor(b_map.squeeze(dim=0), (cond_w, cond_h), do_ceil).unsqueeze(dim=0)  # resize
-                    b_map_cond = helper.resize_tensors(b_map, (cond_w, cond_h), do_ceil)  # resize
-
-                    # concat channel wise
-                    act_cond[block_idx][flow_idx] = torch.cat(tensors=[act_cond[block_idx][flow_idx], b_map_cond], dim=1)
-                    w_cond[block_idx][flow_idx] = torch.cat(tensors=[w_cond[block_idx][flow_idx], b_map_cond], dim=1)
-                    coupling_cond[block_idx][flow_idx] = torch.cat(tensors=[coupling_cond[block_idx][flow_idx], b_map_cond], dim=1)
+                # Alle Features zusammenführen
+                if len(combined_features) > 1:
+                    act_cond[block_idx][flow_idx] = torch.cat(combined_features, dim=1)
+                    w_cond[block_idx][flow_idx] = torch.cat(combined_features, dim=1)
+                    coupling_cond[block_idx][flow_idx] = torch.cat(combined_features, dim=1)
 
         # make conds a dictionary
         conditions = make_cond_dict(act_cond, w_cond, coupling_cond)
 
         # reverse lists for reverse operation
         if direction == 'reverse':
-            conditions['act_cond'] = [list(reversed(cond)) for cond in list(reversed(conditions['act_cond']))]  # reverse 2d list
+            conditions['act_cond'] = [list(reversed(cond)) for cond in list(reversed(conditions['act_cond']))]
             conditions['w_cond'] = [list(reversed(cond)) for cond in list(reversed(conditions['w_cond']))]
             conditions['coupling_cond'] = [list(reversed(cond)) for cond in list(reversed(conditions['coupling_cond']))]
+        
         return conditions
 
-    def forward(self, x_a, x_b, extra_cond=None):  # x_a: segmentation
-        #  perform left glow forward
+    def forward(self, x_a, x_b, extra_cond=None):  # x_a: building, extra_cond: numerical conditions
+        # perform left glow forward
         left_glow_out = self.left_glow(x_a)
 
+        # Verarbeite numerische Bedingungen wenn vorhanden
+        if hasattr(self, 'numerical_net') and extra_cond is not None:
+            numerical_features = self.numerical_net(extra_cond)
+            conditions = self.prep_conds(left_glow_out, numerical_features, direction='forward')
+        else:
+            conditions = self.prep_conds(left_glow_out, extra_cond, direction='forward')
+
         # perform right glow forward
-        conditions = self.prep_conds(left_glow_out, extra_cond, direction='forward')
         right_glow_out = self.right_glow(x_b, conditions)
 
+        # Rest bleibt unverändert
         # extract left outputs
         log_p_sum_left, log_det_left = left_glow_out['log_p_sum'], left_glow_out['log_det']
         z_outs_left, flows_outs_left = left_glow_out['z_outs'], left_glow_out['all_flows_outs']
@@ -101,7 +113,7 @@ class TwoGlows(nn.Module):
 
         return left_glow_outs, right_glow_outs
 
-    def reverse(self, x_a=None, z_b_samples=None, extra_cond=None, reconstruct=False):
+    def reverse(self, x_a=None, z_b_samples=None, extra_cond=None, reconstruct=False, numerical_conditions=None):
         print(f"TwoGlows reverse input shapes: x_a={x_a.shape if x_a is not None else None}, z_b_samples={z_b_samples[0].shape if z_b_samples else None}")
         left_glow_out = self.left_glow(x_a)  # left glow forward always needed before preparing conditions
         conditions = self.prep_conds(left_glow_out, extra_cond, direction='reverse')

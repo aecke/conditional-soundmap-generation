@@ -88,8 +88,12 @@ def extract_batches(batch, args):
     elif args.dataset == 'soundmap':
         building_batch = batch['building'].to(device)
         soundmap_batch = batch['soundmap'].to(device)
-        extra_cond_batch = None
-
+        numerical_conditions = None
+        
+        # Numerische Bedingungen extrahieren falls vorhanden
+        if 'numerical_conditions' in batch:
+            numerical_conditions = batch['numerical_conditions'].to(device)
+        
         if args.direction == 'building2soundmap':
             left_batch = building_batch
             right_batch = soundmap_batch
@@ -97,12 +101,7 @@ def extract_batches(batch, args):
             left_batch = soundmap_batch
             right_batch = building_batch
 
-        return left_batch, right_batch, extra_cond_batch
-
-    else:
-        raise NotImplementedError
-        
-    return left_batch, right_batch, extra_cond_batch
+        return left_batch, right_batch, numerical_conditions
 
 
 def init_data_loaders(args, params):
