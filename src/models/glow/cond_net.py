@@ -279,15 +279,5 @@ class ExtraCondNet(nn.Module):
         )
         
     def forward(self, x):
-        # Debug prints
-        print(f"Input shape: {x.shape}")  # Should be (batch_size, n_features)
-        
-        # Ensure input is 2D: (batch_size, n_features)
-        if len(x.shape) == 1:
-            x = x.unsqueeze(0)  # Add batch dimension if missing
-            
-        # Run through network
-        out = self.net(x)
-        print(f"Output shape: {out.shape}")  # Should be (batch_size, output_dim)
-        
-        return out
+        x = x.to(self.net[0].weight.device)
+        return self.net(x)

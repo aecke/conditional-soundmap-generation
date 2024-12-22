@@ -207,11 +207,15 @@ class TwoGlows(nn.Module):
         left_glow_out = self.left_glow(x_a)
         
         if self.has_extra_cond and extra_cond is not None:
+            # Ensure extra_cond is on same device as model
+            if not isinstance(extra_cond, torch.Tensor):
+                extra_cond = torch.tensor(extra_cond, dtype=torch.float32)
+            extra_cond = extra_cond.to(self.extra_net.net[0].weight.device)
             extra_features = self.extra_net(extra_cond)
             conditions = self.prep_conds(left_glow_out, extra_features, direction='reverse')
         else:
             conditions = self.prep_conds(left_glow_out, None, direction='reverse')
-        
+            
         x_b_syn = self.right_glow.reverse(z_b_samples, reconstruct=reconstruct, conditions=conditions)
         return x_b_syn
 
