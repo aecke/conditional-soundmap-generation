@@ -23,6 +23,20 @@ class TrainingLogger:
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.model_name = args.model
         
+        # Extra Conditions Configuration
+        self.use_extra_cond = any([
+            args.use_temperature,
+            args.use_humidity, 
+            args.use_db
+        ])
+        self.active_conditions = []
+        if args.use_temperature:
+            self.active_conditions.append("temperature")
+        if args.use_humidity:
+            self.active_conditions.append("humidity")
+        if args.use_db:
+            self.active_conditions.append("db")
+        
         # Initialize metrics tracking
         self.metrics = {
             'train_loss': [],
@@ -43,13 +57,23 @@ class TrainingLogger:
         self.log_hyperparameters(args, params)
 
     def log_hyperparameters(self, args, params):
-        """Log training hyperparameters at the start of training."""
+        """
+        Log training hyperparameters and initial configuration.
+        
+        Args:
+            args: Command line arguments containing training configuration
+            params: Model parameters and settings
+        """
         hyperparameters = {
             'model_name': self.model_name,
             'timestamp': self.timestamp,
             'args': vars(args),
             'params': params,
-            'device': str(torch.cuda.get_device_name(0)) if torch.cuda.is_available() else 'cpu'
+            'device': str(torch.cuda.get_device_name(0)) if torch.cuda.is_available() else 'cpu',
+            'extra_conditioning': {
+                'enabled': self.use_extra_cond,
+                'active_conditions': self.active_conditions
+            }
         }
         
         with open(self.log_file, 'w') as f:
@@ -66,7 +90,7 @@ class TrainingLogger:
         """
         memory = torch.cuda.memory_allocated()/1e9 if torch.cuda.is_available() else 0
         
-        # Update internal metrics
+        # Update internal metrics tracking
         self.metrics['iteration'].append(optim_step)
         self.metrics['train_loss'].append(metrics.get('loss', None))
         self.metrics['val_loss'].append(metrics.get('val_loss', None))
@@ -76,18 +100,24 @@ class TrainingLogger:
         self.metrics['iteration_time'].append(time_taken)
         self.metrics['memory_usage'].append(memory)
 
+        # Create comprehensive log entry
+        log_entry = {
+            'iteration': optim_step,
+            'metrics': metrics,
+            'time_taken': time_taken,
+            'memory_used': memory,
+            'extra_cond_info': {
+                'enabled': self.use_extra_cond,
+                'conditions': self.active_conditions
+            } if self.use_extra_cond else None
+        }
+        
         # Append to log file
         with open(self.log_file, 'a') as f:
-            log_entry = {
-                'iteration': optim_step,
-                'metrics': metrics,
-                'time_taken': time_taken,
-                'memory_used': memory
-            }
             f.write(json.dumps(log_entry) + '\n')
 
     def write_summary(self):
-        """Write a summary of the training run including best metrics."""
+        """Write a summary of the training run including best metrics and configuration."""
         best_metrics = self.get_best_metrics()
         avg_iteration_time = sum(self.metrics['iteration_time']) / len(self.metrics['iteration_time'])
         
@@ -96,6 +126,10 @@ class TrainingLogger:
 Model: {self.model_name}
 Run timestamp: {self.timestamp}
 Total iterations: {len(self.metrics['iteration'])}
+
+Extra Conditioning:
+- Enabled: {self.use_extra_cond}
+- Active conditions: {', '.join(self.active_conditions) if self.active_conditions else 'None'}
 
 Best Metrics:
 - Best training loss: {best_metrics['best_train_loss']:.6f}
