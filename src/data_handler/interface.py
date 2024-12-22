@@ -88,14 +88,14 @@ def extract_batches(batch, args):
     elif args.dataset == 'soundmap':
         building_batch = batch['building'].to(device)
         soundmap_batch = batch['soundmap'].to(device)
-        numerical_conditions = None
+        extra_cond = None
     
     # Numerische Bedingungen nur extrahieren wenn die Flags gesetzt sind
     if any([args.use_temperature, args.use_humidity, args.use_db]):
-        if 'numerical_conditions' not in batch:
+        if 'extra_cond' not in batch:
             print("Warning: Numerical conditions flags are set but no numerical data found in batch")
         else:
-            numerical_conditions = batch['numerical_conditions'].to(device)
+            extra_cond = batch['extra_cond'].to(device)
     
     if args.direction == 'building2soundmap':
         left_batch = building_batch
@@ -104,7 +104,7 @@ def extract_batches(batch, args):
         left_batch = soundmap_batch
         right_batch = building_batch
 
-    return left_batch, right_batch, numerical_conditions
+    return left_batch, right_batch, extra_cond
 
 
 def init_data_loaders(args, params):

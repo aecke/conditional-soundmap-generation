@@ -59,7 +59,8 @@ def read_params_and_args():
     parser.add_argument("--bsize", type=int)
     parser.add_argument("--lr", type=float)
     parser.add_argument("--temp", type=float)  # temperature
-    parser.add_argument("--reg_factor", type=float)
+    parser.add_argument("--reg_factor", type=float, default=1.0)
+
 
     # Note: left_lr is str since it is used only for finding the checkpoints path of the left glow
     parser.add_argument(

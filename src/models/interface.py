@@ -38,7 +38,7 @@ def take_samples(args, params, model, reverse_cond, n_samples=None):
                 sampled_images = model.reverse(
                     x_a=reverse_cond,  # Jetzt mit korrekter Batch-Size
                     z_b_samples=z_samples,
-                    numerical_conditions=batch['numerical_conditions']
+                    extra_cond=batch['extra_cond']
                 ).cpu().data
 
         else:
@@ -101,12 +101,12 @@ def init_model_configs(args):
 
     # Numerische Bedingungen nur hinzufügen wenn das Dataset soundmap ist
     if args.dataset == 'soundmap':
-        n_numerical_conditions = sum([
+        n_extra_cond = sum([
             getattr(args, 'use_temperature', False),
             getattr(args, 'use_humidity', False),
             getattr(args, 'use_db', False)
         ])
-        right_configs['n_numerical_conditions'] = n_numerical_conditions
+        right_configs['n_extra_cond'] = n_extra_cond
         
         right_configs.update({
             'use_temperature': getattr(args, 'use_temperature', False),

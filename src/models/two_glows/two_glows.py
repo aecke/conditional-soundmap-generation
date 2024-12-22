@@ -8,72 +8,108 @@ class TwoGlows(nn.Module):
     def __init__(self, params, left_configs, right_configs):
         super().__init__()
         self.left_configs, self.right_configs = left_configs, right_configs
-
-        self.split_type = right_configs['split_type']  # this attribute will also be used in take sample
-        condition = right_configs['condition']
-        input_shapes = calc_inp_shapes(params['channels'],
-                                       params['img_size'],
-                                       params['n_block'],
-                                       self.split_type)
-
-        cond_shapes = calc_cond_shapes(params['channels'],
-                                       params['img_size'],
-                                       params['n_block'],
-                                       self.split_type,
-                                       condition)  # shape (C, H, W)
-
-        # print_all_shapes(input_shapes, cond_shapes, params, split_type)
-
-        self.left_glow = init_glow(n_blocks=params['n_block'],
-                                   n_flows=params['n_flow'],
-                                   input_shapes=input_shapes,
-                                   cond_shapes=None,
-                                   configs=left_configs)
-
-        self.right_glow = init_glow(n_blocks=params['n_block'],
-                                    n_flows=params['n_flow'],
-                                    input_shapes=input_shapes,
-                                    cond_shapes=cond_shapes,
-                                    configs=right_configs)
+        self.split_type = right_configs['split_type']
         
+        # Berechne Base-Input-Shapes ohne numerische Conditions
+        input_shapes = calc_inp_shapes(
+            params['channels'],
+            params['img_size'],
+            params['n_block'],
+            self.split_type
+        )
+        
+        # Setup für numerische Conditions
         self.use_temperature = right_configs.get('use_temperature', False)
         self.use_humidity = right_configs.get('use_humidity', False)
         self.use_db = right_configs.get('use_db', False)
         
         n_numerical = sum([self.use_temperature, self.use_humidity, self.use_db])
-        if n_numerical > 0:
-            self.numerical_net = NumericalCondNet(n_numerical)
+        self.has_numerical = n_numerical > 0
+        
+        if self.has_numerical:
+            self.numerical_hidden_dim = 64
+            self.numerical_output_dim = 32  # Reduzierte Feature-Dimension für numerische Daten
+            self.numerical_net = NumericalCondNet(
+                n_features=n_numerical,
+                hidden_dim=self.numerical_hidden_dim,
+                output_dim=self.numerical_output_dim
+            )
+            
+            # Aktualisiere Input-Shapes für die Conditions mit zusätzlichen numerischen Features
+            condition = right_configs['condition']
+            cond_shapes = calc_cond_shapes_with_numerical(
+                params['channels'],
+                params['img_size'],
+                params['n_block'],
+                self.split_type,
+                condition,
+                self.numerical_output_dim
+            )
+        else:
+            condition = right_configs['condition']
+            cond_shapes = calc_cond_shapes(
+                params['channels'],
+                params['img_size'],
+                params['n_block'],
+                self.split_type,
+                condition
+            )
 
-    def prep_conds(self, left_glow_out, numerical_conditions, direction):
+        self.left_glow = init_glow(
+            n_blocks=params['n_block'],
+            n_flows=params['n_flow'],
+            input_shapes=input_shapes,
+            cond_shapes=None,
+            configs=left_configs
+        )
+
+        self.right_glow = init_glow(
+            n_blocks=params['n_block'],
+            n_flows=params['n_flow'],
+            input_shapes=input_shapes,
+            cond_shapes=cond_shapes,
+            configs=right_configs
+        )
+
+    def prep_conds(self, left_glow_out, extra_cond, direction):
         act_cond = left_glow_out['all_act_outs']
         w_cond = left_glow_out['all_w_outs']
         coupling_cond = left_glow_out['all_flows_outs']
 
+        # Verarbeite numerische Conditions wenn vorhanden
+        numerical_features = None
+        if self.has_numerical and extra_cond is not None:
+            numerical_features = self.numerical_net(extra_cond)  # Shape: (batch_size, numerical_output_dim)
+
         # Für jeden Block und Flow die Bedingungen vorbereiten
         for block_idx in range(len(act_cond)):
             for flow_idx in range(len(act_cond[block_idx])):
-                cond_h, cond_w = act_cond[block_idx][flow_idx].shape[2:]
-                combined_features = [act_cond[block_idx][flow_idx]]  # Start mit Bild-Features
+                base_features = act_cond[block_idx][flow_idx]
+                batch_size, _, height, width = base_features.shape
                 
-                # 1. Building Features sind immer dabei
-                # sind bereits in act_cond enthalten
-                
-                # 2. Numerische Bedingungen hinzufügen falls vorhanden
-                if hasattr(self, 'numerical_net') and isinstance(numerical_conditions, torch.Tensor) and len(numerical_conditions.shape) == 2:
-                    num_features = numerical_conditions.unsqueeze(-1).unsqueeze(-1)
-                    num_features = num_features.expand(-1, -1, cond_h, cond_w)
-                    combined_features.append(num_features)
+                if numerical_features is not None:
+                    # Erweitere numerische Features auf räumliche Dimensionen
+                    num_features = numerical_features.unsqueeze(-1).unsqueeze(-1)
+                    num_features = num_features.expand(-1, -1, height, width)
+                    
+                    # Konkateniere Features
+                    combined_features = torch.cat([base_features, num_features], dim=1)
+                else:
+                    combined_features = base_features
 
-                # Alle Features zusammenführen
-                if len(combined_features) > 1:
-                    act_cond[block_idx][flow_idx] = torch.cat(combined_features, dim=1)
-                    w_cond[block_idx][flow_idx] = torch.cat(combined_features, dim=1)
-                    coupling_cond[block_idx][flow_idx] = torch.cat(combined_features, dim=1)
+                # Update conditions
+                act_cond[block_idx][flow_idx] = combined_features
+                w_cond[block_idx][flow_idx] = combined_features
+                coupling_cond[block_idx][flow_idx] = combined_features
 
-        # make conds a dictionary
-        conditions = make_cond_dict(act_cond, w_cond, coupling_cond)
+        # Erstelle Conditions Dictionary
+        conditions = {
+            'act_cond': act_cond,
+            'w_cond': w_cond,
+            'coupling_cond': coupling_cond
+        }
 
-        # reverse lists for reverse operation
+        # Kehre Listen für Reverse-Operation um
         if direction == 'reverse':
             conditions['act_cond'] = [list(reversed(cond)) for cond in list(reversed(conditions['act_cond']))]
             conditions['w_cond'] = [list(reversed(cond)) for cond in list(reversed(conditions['w_cond']))]
@@ -81,16 +117,16 @@ class TwoGlows(nn.Module):
         
         return conditions
 
-    def forward(self, x_a, x_b, numerical_conditions=None):  # x_a: building, numerical_conditions: numerical conditions
+    def forward(self, x_a, x_b, extra_cond=None):  # x_a: building, extra_cond: numerical conditions
         # perform left glow forward
         left_glow_out = self.left_glow(x_a)
 
         # Verarbeite numerische Bedingungen wenn vorhanden
-        if hasattr(self, 'numerical_net') and numerical_conditions is not None:
-            numerical_features = self.numerical_net(numerical_conditions)
+        if hasattr(self, 'numerical_net') and extra_cond is not None:
+            numerical_features = self.numerical_net(extra_cond)
             conditions = self.prep_conds(left_glow_out, numerical_features, direction='forward')
         else:
-            conditions = self.prep_conds(left_glow_out, numerical_conditions, direction='forward')
+            conditions = self.prep_conds(left_glow_out, extra_cond, direction='forward')
 
         # perform right glow forward
         right_glow_out = self.right_glow(x_b, conditions)
@@ -114,10 +150,10 @@ class TwoGlows(nn.Module):
 
         return left_glow_outs, right_glow_outs
 
-    def reverse(self, x_a=None, z_b_samples=None, numerical_conditions=None, reconstruct=False):
+    def reverse(self, x_a=None, z_b_samples=None, extra_cond=None, reconstruct=False):
         print(f"TwoGlows reverse input shapes: x_a={x_a.shape if x_a is not None else None}, z_b_samples={z_b_samples[0].shape if z_b_samples else None}")
         left_glow_out = self.left_glow(x_a)  # left glow forward always needed before preparing conditions
-        conditions = self.prep_conds(left_glow_out, numerical_conditions, direction='reverse')
+        conditions = self.prep_conds(left_glow_out, extra_cond, direction='reverse')
         x_b_syn = self.right_glow.reverse(z_b_samples, reconstruct=reconstruct, conditions=conditions)  # sample x_b conditioned on x_a
         return x_b_syn
 

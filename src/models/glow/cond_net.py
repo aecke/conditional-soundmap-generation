@@ -264,13 +264,20 @@ class CouplingCondNet(nn.Module):
         return conv_out
 
 class NumericalCondNet(nn.Module):
-    def __init__(self, n_features):
+    def __init__(self, n_features, hidden_dim=64, output_dim=32):
+        """
+        Args:
+            n_features: Anzahl der numerischen Features (z.B. 3 für temp,humidity,db)
+            hidden_dim: Größe der versteckten Schicht
+            output_dim: Dimension des Output-Embeddings
+        """
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(n_features, 64),
+            nn.Linear(n_features, hidden_dim),
             nn.ReLU(),
-            nn.Linear(64, 128)
+            nn.Linear(hidden_dim, output_dim)
         )
-    
+        
     def forward(self, x):
-        return self.net(x)
+        # x hat Shape (batch_size, n_features)
+        return self.net(x)  # Output Shape: (batch_size, output_dim)

@@ -115,12 +115,12 @@ class SoundMapDataset(data.Dataset):
         # Numerische Bedingungen sammeln (bereits normalisiert)
         if self.numerical_cols:
             try:
-                numerical_conditions = []
+                extra_cond = []
                 for col in self.numerical_cols:
                     if pd.isna(row[col]):
                         raise ValueError(f"Missing value for {col} in row {idx}")
-                    numerical_conditions.append(row[col])
-                result['numerical_conditions'] = torch.tensor(numerical_conditions, dtype=torch.float32)
+                    extra_cond.append(row[col])
+                result['extra_cond'] = torch.tensor(extra_cond, dtype=torch.float32)
             except Exception as e:
                 print(f"Error processing numerical conditions for row {idx}: {e}")
                 raise

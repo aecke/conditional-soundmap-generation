@@ -51,14 +51,14 @@ def train(
     
     # Log numerical conditions configuration
     if any([args.use_temperature, args.use_humidity, args.use_db]):
-        numerical_conditions = []
+        extra_cond = []
         if args.use_temperature:
-            numerical_conditions.append('temperature')
+            extra_cond.append('temperature')
         if args.use_humidity:
-            numerical_conditions.append('humidity') 
+            extra_cond.append('humidity') 
         if args.use_db:
-            numerical_conditions.append('db')
-        print(f"Training with numerical conditions: {', '.join(numerical_conditions)}")
+            extra_cond.append('db')
+        print(f"Training with numerical conditions: {', '.join(extra_cond)}")
 
     # adjusting optim step
     optim_step = last_optim_step + 1 if resume else 1
@@ -91,11 +91,11 @@ def train(
 
             begin_time = time.time()
             # forward pass
-            left_batch, right_batch, numerical_conditions = data_handler.extract_batches(
+            left_batch, right_batch, extra_cond = data_handler.extract_batches(
                 batch, args
             )
             forward_output = forward_and_loss(
-                args, params, model, left_batch, right_batch, numerical_conditions
+                args, params, model, left_batch, right_batch, extra_cond
             )
 
             # regularize left loss
@@ -185,7 +185,7 @@ def train(
                 
                 # Speichere auch die numerischen Bedingungen
                 additional_info = {
-                    'numerical_conditions': {
+                    'extra_cond': {
                         'temperature': args.use_temperature,
                         'humidity': args.use_humidity,
                         'db': args.use_db
