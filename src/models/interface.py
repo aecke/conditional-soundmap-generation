@@ -34,21 +34,34 @@ def take_samples(args, params, model, reverse_cond, batch, n_samples=None):
                                 n_block=params['n_block'],
                                 split_type=model.split_type)
             
+            # Prüfe ob extra conditions verwendet werden sollen
             use_extra_cond = any([
                 getattr(args, 'use_temperature', False),
                 getattr(args, 'use_humidity', False),
                 getattr(args, 'use_db', False)
             ])
             
+            # Extrahiere extra_cond wenn benötigt
             extra_cond = None
-            if use_extra_cond and batch is not None:
-                extra_cond = batch.get('extra_cond', None)
-                    
+            if use_extra_cond and batch is not None and 'extra_cond' in batch:
+                extra_cond = batch['extra_cond']
+                if extra_cond is not None:
+                    # Wiederhole extra_cond für alle Samples
+                    if len(extra_cond.shape) == 1:
+                        extra_cond = extra_cond.unsqueeze(0)
+                    extra_cond = extra_cond.repeat(num_samples, 1)
+            
             if args.direction == 'building2soundmap':
                 sampled_images = model.reverse(
-                    x_a=reverse_cond,  # Jetzt mit korrekter Batch-Size
+                    x_a=reverse_cond,  # Building als Condition
                     z_b_samples=z_samples,
-                    extra_cond=batch['extra_cond']
+                    extra_cond=extra_cond  # Kann nun None oder die conditions sein
+                ).cpu().data
+            else:
+                sampled_images = model.reverse(
+                    x_a=reverse_cond,  # Soundmap als Condition
+                    z_b_samples=z_samples, 
+                    extra_cond=extra_cond  # Kann nun None oder die conditions sein
                 ).cpu().data
 
         else:
