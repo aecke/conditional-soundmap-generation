@@ -40,8 +40,9 @@ def take_samples(args, params, model, reverse_cond, batch, n_samples=None):
                 getattr(args, 'use_db', False)
             ])
             
-            # Extrahiere extra_cond nur wenn benötigt
-            extra_cond = batch.get('extra_cond', None) if use_extra_cond else None  
+            extra_cond = None
+            if use_extra_cond and batch is not None:
+                extra_cond = batch.get('extra_cond', None)
                     
             if args.direction == 'building2soundmap':
                 sampled_images = model.reverse(
