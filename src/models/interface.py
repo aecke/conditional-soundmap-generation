@@ -33,7 +33,16 @@ def take_samples(args, params, model, reverse_cond, batch, n_samples=None):
                                 img_size=params['img_size'],
                                 n_block=params['n_block'],
                                 split_type=model.split_type)
-
+            
+            use_extra_cond = any([
+                getattr(args, 'use_temperature', False),
+                getattr(args, 'use_humidity', False),
+                getattr(args, 'use_db', False)
+            ])
+            
+            # Extrahiere extra_cond nur wenn benötigt
+            extra_cond = batch.get('extra_cond', None) if use_extra_cond else None  
+                    
             if args.direction == 'building2soundmap':
                 sampled_images = model.reverse(
                     x_a=reverse_cond,  # Jetzt mit korrekter Batch-Size
