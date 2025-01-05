@@ -10,6 +10,8 @@ import helper
 import models
 from globals import device
 from sklearn.preprocessing import MinMaxScaler
+import time
+import csv
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate soundmaps from test buildings")
@@ -34,7 +36,7 @@ def main():
     # Paths - allow override through command line
     CHECKPOINT_PATH = args_cmd.checkpoint_path or "E:/ba_ergebnisse/urban_sound_25k_reflection/Checkpoints/soundmap/256x256/glow_improved/building2soundmap"
     TEST_DATA_PATH = args_cmd.dataset_path or "E:/Schallsimulationsdaten/urban_sound_25k_reflection/test"
-    OUTPUT_PATH = "E:/ba_ergebnisse/urban_sound_25k_reflection/evaluation_results/pred"
+    OUTPUT_PATH = "E:/ba_ergebnisse/urban_sound_25k_reflection/evaluation_results2/pred"
 
     # Create output directory
     helper.make_dir_if_not_exists(OUTPUT_PATH)
@@ -61,7 +63,6 @@ def main():
             self.n_flow = params['n_flow']
             self.reg_factor = 0.0001
             self.use_bmaps = False
-            # Use conditions from command line arguments
             self.use_temperature = args_cmd.use_temperature
             self.use_humidity = args_cmd.use_humidity
             self.use_db = args_cmd.use_db
@@ -140,7 +141,7 @@ def main():
 
     if args.use_temperature:
         scalers['temperature'] = MinMaxScaler()
-        temp_range = np.linspace(-20, 40, 1000).reshape(-1, 1)  # Angepasster Temperaturbereich
+        temp_range = np.linspace(-20, 40, 1000).reshape(-1, 1)
         scalers['temperature'].fit(temp_range)
         
     if args.use_humidity:
@@ -153,6 +154,12 @@ def main():
     successful = 0
     failed = 0
     error_log = []
+    
+    # Create CSV file for runtime tracking
+    runtime_csv_path = os.path.join(OUTPUT_PATH, "inference_times.csv")
+    with open(runtime_csv_path, 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerow(['sample_id', 'osm_file', 'inference_time', 'status'])
 
     # Main processing loop
     print("\nStarting prediction generation...")
@@ -200,7 +207,8 @@ def main():
                 if extra_cond_values:
                     batch['extra_cond'] = torch.tensor(extra_cond_values, dtype=torch.float32).to(device)
                 
-                # Generate prediction
+                # Measure inference time
+                start_time = time.time()
                 sampled_images = models.take_samples(
                     args,
                     params,
@@ -209,6 +217,7 @@ def main():
                     batch,
                     n_samples=1
                 )
+                inference_time = time.time() - start_time
                 
                 # Validate generated image
                 if torch.isnan(sampled_images).any():
@@ -221,6 +230,11 @@ def main():
                     normalize=True
                 )
                 
+                # Log successful inference time
+                with open(runtime_csv_path, 'a', newline='') as csvfile:
+                    csvwriter = csv.writer(csvfile)
+                    csvwriter.writerow([idx, building_filename, inference_time, 'success'])
+                
                 successful += 1
                 
                 # Memory management
@@ -232,7 +246,16 @@ def main():
                 error_msg = f"Error processing sample {idx}: {str(e)}"
                 error_log.append(error_msg)
                 print(f"\n{error_msg}")
+                
+                # Log failed inference
+                with open(runtime_csv_path, 'a', newline='') as csvfile:
+                    csvwriter = csv.writer(csvfile)
+                    csvwriter.writerow([idx, building_filename, -1, 'failed'])
                 continue
+
+    # Load and analyze runtime data
+    runtime_df = pd.read_csv(runtime_csv_path)
+    successful_times = runtime_df[runtime_df['status'] == 'success']['inference_time']
 
     # Print final statistics
     print("\nProcessing complete:")
@@ -240,6 +263,16 @@ def main():
     print(f"Successfully processed: {successful}")
     print(f"Failed: {failed}")
     print(f"Success rate: {(successful/total_samples)*100:.2f}%")
+    
+    print("\nInference Time Statistics:")
+    if len(successful_times) > 0:
+        print(f"Average inference time: {successful_times.mean():.4f} seconds")
+        print(f"Median inference time: {successful_times.median():.4f} seconds")
+        print(f"Min inference time: {successful_times.min():.4f} seconds")
+        print(f"Max inference time: {successful_times.max():.4f} seconds")
+        print(f"Total inference time: {successful_times.sum():.2f} seconds")
+    
+    print(f"\nRuntime statistics saved to: {runtime_csv_path}")
 
     # Save error log
     if error_log:
