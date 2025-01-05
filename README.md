@@ -49,7 +49,7 @@ Configure the data paths in `params.json`:
 ### Basic Training
 Train the model using only building layouts to generate sound maps:
 ```bash
-python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint
+python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --checkpoint_reentrant False
 ```
 
 ### Training with Environmental Conditions

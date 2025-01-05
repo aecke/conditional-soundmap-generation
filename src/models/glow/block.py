@@ -83,7 +83,7 @@ class Block(nn.Module):
 
             if self.configs['grad_checkpoint']:
                 dummy_tensor = torch.ones(out.shape, dtype=torch.float32, requires_grad=True)  # needed so the output requires grad
-                flow_output = checkpoint.checkpoint(flow, out, act_cond, w_cond, coupling_cond, dummy_tensor)
+                flow_output = checkpoint.checkpoint(flow, out, act_cond, w_cond, coupling_cond, dummy_tensor, use_reentrant=False)
             else:
                 flow_output = flow(out, act_cond, w_cond, coupling_cond)  # Flow forward
 

@@ -104,9 +104,19 @@ def verify_invertibility(args, params):
 
 def init_model_configs(args):
     assert 'improved' in args.model  # otherwise not implemented yet
-    left_configs = {'all_conditional': False, 'split_type': 'regular', 'do_lu': False, 'grad_checkpoint': False}  # default
-    right_configs = {'all_conditional': True, 'split_type': 'regular', 'do_lu': False, 'condition': 'left', 'grad_checkpoint': False}  # default condition from left glow
-
+    left_configs = {
+        'all_conditional': False, 
+        'split_type': 'regular', 
+        'do_lu': False, 
+        'grad_checkpoint': {'use_reentrant': False} if args.grad_checkpoint else False
+    }
+    right_configs = {
+        'all_conditional': True,
+        'split_type': 'regular',
+        'do_lu': False,
+        'condition': 'left',
+        'grad_checkpoint': {'use_reentrant': False} if args.grad_checkpoint else False
+    }
     if 'improved' in args.model:
         if args.do_lu:
             left_configs['do_lu'] = True
