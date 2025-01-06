@@ -2,7 +2,7 @@
 
 This repository contains an adapted implementation of Full-Glow for urban sound map generation. It is based on [Full-Glow: Fully conditional Glow for more realistic image generation](https://arxiv.org/abs/2012.05846).
 
-The original Full-Glow model has been modified to work with sound map data, allowing for the generation of sound maps from building layouts while optionally considering environmental conditions like temperature, humidity and sound levels.
+The original Full-Glow model has been modified to work with sound map data, allowing for the generation of sound maps from building layouts while considering acoustic and environmental conditions like temperature, humidity and noise levels.
 
 ## Environment Setup
 
@@ -43,37 +43,146 @@ Configure the data paths in `params.json`:
     "checkpoints_path": "path/to/checkpoints"
 }
 ```
+## Training, Generation and Evaluation
 
-## Training Commands
+### 1. Training Commands
 
-### Basic Training
-Train the model using only building layouts to generate sound maps:
+### Dataset-specific Training Commands
+
+1. Baseline Model (without conditions):
 ```bash
 python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --checkpoint_reentrant False
 ```
 
-### Training with Environmental Conditions
-You can include different combinations of environmental conditions:
-
-1. Using temperature only:
+2. Diffraction Model (with noise level):
 ```bash
-python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_temperature
+python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_db --checkpoint_reentrant False
 ```
 
-2. Using humidity only:
+3. Reflection Model (with noise level):
 ```bash
-python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_humidity
+python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_db --checkpoint_reentrant False
 ```
 
-3. Using decibel level only:
+4. Combined Model (with all conditions):
 ```bash
-python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_db
+python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_temperature --use_humidity --use_db --checkpoint_reentrant False
 ```
 
-4. Using multiple conditions:
+### 2. Sample Generation
+
+After training, you can generate samples and evaluate the model using the following commands for each dataset:
+
+#### Baseline Model:
 ```bash
-python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_temperature --use_humidity --use_db
+python generate_soundmaps.py \
+  --checkpoint_path "path/to/urban_sound_25k_baseline/Checkpoints/soundmap/256x256/glow_improved/building2soundmap" \
+  --dataset_path "path/to/urban_sound_25k_baseline/test" \
+  --output_base "path/to/evaluation_results" \
+  --model_type "urban_sound_25k_baseline"
 ```
+
+#### Diffraction Model:
+```bash
+python generate_soundmaps.py \
+  --checkpoint_path "path/to/urban_sound_25k_diffraction/Checkpoints/soundmap/256x256/glow_improved/building2soundmap" \
+  --dataset_path "path/to/urban_sound_25k_diffraction/test" \
+  --output_base "path/to/evaluation_results" \
+  --model_type "urban_sound_25k_diffraction" \
+  --use_db
+```
+
+#### Reflection Model:
+```bash
+python generate_soundmaps.py \
+  --checkpoint_path "path/to/urban_sound_25k_reflection/Checkpoints/soundmap/256x256/glow_improved/building2soundmap" \
+  --dataset_path "path/to/urban_sound_25k_reflection/test" \
+  --output_base "path/to/evaluation_results" \
+  --model_type "urban_sound_25k_reflection" \
+  --use_db
+```
+
+#### Combined Model:
+```bash
+python generate_soundmaps.py \
+  --checkpoint_path "path/to/urban_sound_25k_combined/Checkpoints/soundmap/256x256/glow_improved/building2soundmap" \
+  --dataset_path "path/to/urban_sound_25k_combined/test" \
+  --output_base "path/to/evaluation_results" \
+  --model_type "urban_sound_25k_combined" \
+  --use_temperature --use_humidity --use_db
+```
+
+### 3. Model Evaluation
+
+After generating samples, run the evaluation script to calculate metrics. Replace TIMESTAMP with the timestamp of your generation run (format: YYYYMMDD_HHMMSS):
+
+#### Baseline Model:
+```bash
+python sound_metrics.py \
+  --data_dir "path/to/urban_sound_25k_baseline/test" \
+  --pred_dir "path/to/evaluation_results/urban_sound_25k_baseline/predictions" \
+  --output_dir "path/to/evaluation_results" \
+  --model_type "urban_sound_25k_baseline"
+```
+
+#### Diffraction Model:
+```bash
+python sound_metrics.py \
+  --data_dir "path/to/urban_sound_25k_diffraction/test" \
+  --pred_dir "path/to/evaluation_results/urban_sound_25k_diffraction/predictions" \
+  --output_dir "path/to/evaluation_results" \
+  --model_type "urban_sound_25k_diffraction"
+```
+
+#### Reflection Model:
+```bash
+python sound_metrics.py \
+  --data_dir "path/to/urban_sound_25k_reflection/test" \
+  --pred_dir "path/to/evaluation_results/urban_sound_25k_reflection/predictions" \
+  --output_dir "path/to/evaluation_results" \
+  --model_type "urban_sound_25k_reflection"
+```
+
+#### Combined Model:
+```bash
+python sound_metrics.py \
+  --data_dir "path/to/urban_sound_25k_combined/test" \
+  --pred_dir "path/to/evaluation_results/urban_sound_25k_combined/predictions" \
+  --output_dir "path/to/evaluation_results" \
+  --model_type "urban_sound_25k_combined"
+```
+
+### Evaluation Metrics
+
+The evaluation script calculates the following metrics:
+- MAE (Mean Absolute Error)
+- MAPE (Mean Absolute Percentage Error)
+- LoS (Line of Sight) specific metrics
+  - LoS_MAE: MAE for visible areas
+  - NLoS_MAE: MAE for non-visible areas
+  - LoS_wMAPE: Weighted MAPE for visible areas
+  - NLoS_wMAPE: Weighted MAPE for non-visible areas
+
+### Output Structure
+
+The evaluation creates the following directory structure:
+```
+evaluation_results/
+├── urban_sound_25k_baseline/
+├── urban_sound_25k_diffraction/
+├── urban_sound_25k_combined/
+└── urban_sound_25k_reflection/
+    └── TIMESTAMP/
+        ├── predictions/          # Generated soundmaps
+        ├── metrics/             # Evaluation results
+        │   ├── inference_times.csv
+        │   ├── performance_statistics.json
+        │   ├── detailed_results.csv
+        │   ├── summary_statistics.csv
+        │   └── plots/          # Visualization plots
+        ├── logs/               # Error logs
+        └── evaluation_config.json
+
 
 ### CSV Format for Environmental Conditions
 When using environmental conditions, your CSV file should contain the following columns:
@@ -102,6 +211,7 @@ Note: The db values are stored as JSON strings containing the "lwd500" key.
 - `--temperature`: Sampling temperature (default: 1.0)
 - `--do_lu`: Enable LU decomposition for invertible 1x1 convolutions
 - `--grad_checkpoint`: Enable gradient checkpointing to reduce memory usage
+- `--checkpoint_reentrant`: Set checkpoint reentrant behavior (default: True)
 - `--use_temperature`: Enable temperature conditioning
 - `--use_humidity`: Enable humidity conditioning
 - `--use_db`: Enable decibel level conditioning

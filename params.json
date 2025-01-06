@@ -84,9 +84,9 @@
   },
 
    "soundmap": {
-    "sample_freq": 500,
+    "sample_freq": 2500,
     "checkpoint_freq": 25000,
-    "val_freq": 10,
+    "val_freq": 25000,
     "iter": 1200000,
     "n_flow": [8,8,8,8], 
     "n_block": 4,

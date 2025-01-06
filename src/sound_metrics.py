@@ -7,7 +7,7 @@ import os
 import pandas as pd
 from tqdm import tqdm 
 import matplotlib.pyplot as plt
-
+import json
 
 def MAE(y_true, y_pred):
     return np.mean(np.abs(y_true - y_pred))
@@ -50,7 +50,6 @@ def calc_mape(true_path, pred_path):
 
     # Calculate the MAPE over the whole image, ignoring positions where both are 0
     return np.mean(error_map)
-
 
 @jit(nopython=True)
 def ray_tracing(image_size, image_map):
@@ -162,61 +161,156 @@ def calculate_sight_error(true_path, pred_path, osm_path):
 
     return masked_mae(in_sight_soundmap, in_sight_pred_soundmap), masked_mae(not_in_sight_soundmap, not_in_sight_pred_soundmap), masked_mape(in_sight_soundmap, in_sight_pred_soundmap), masked_mape(not_in_sight_soundmap, not_in_sight_pred_soundmap)
 
-def evaluate_sample(true_path, pred_path, osm_path=None) -> (float, float, float, float):
-    # Hier sollte true_path bereits der vollständige Pfad zur Soundmap sein
+def evaluate_sample(true_path, pred_path, osm_path=None):
     mae = calc_mae(true_path, pred_path)
     mape = calc_mape(true_path, pred_path)
 
-    mae_in_sight, mae_not_in_sight = None, None
+    mae_in_sight = mae_not_in_sight = mape_in_sight = mape_not_in_sight = None
     if osm_path is not None:
         mae_in_sight, mae_not_in_sight, mape_in_sight, mape_not_in_sight = calculate_sight_error(
             true_path, pred_path, osm_path
         )
     return mae, mape, mae_in_sight, mae_not_in_sight, mape_in_sight, mape_not_in_sight
 
-## main function for evaluation
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--data_dir", type=str, default="data/true")
-    parser.add_argument("--pred_dir", type=str, default="data/pred")
-    parser.add_argument("--output", type=str, default="evaluation.csv")
-    args = parser.parse_args()
+def parse_args():
+    parser = argparse.ArgumentParser(description="Evaluate generated soundmaps")
+    parser.add_argument("--data_dir", type=str, required=True,
+                      help="Directory containing test dataset")
+    parser.add_argument("--pred_dir", type=str, required=True,
+                      help="Directory containing predictions to evaluate")
+    parser.add_argument("--output_dir", type=str, required=True,
+                      help="Directory for evaluation outputs")
+    parser.add_argument("--model_type", type=str, required=True,
+                      help="Type of model being evaluated (with_extra_conditions or without_extra_conditions)")
+    return parser.parse_args()
 
-    test_df = pd.read_csv(os.path.join(args.data_dir, "test.csv"))
+def setup_metric_directories(args):
+    """Setup directories for metric results."""
+    eval_dir = os.path.join(args.output_dir, args.model_type, 'metrics')
+    os.makedirs(eval_dir, exist_ok=True)
+    
+    paths = {
+        'detailed_results': os.path.join(eval_dir, 'detailed_results.csv'),
+        'summary_stats': os.path.join(eval_dir, 'summary_statistics.csv'),
+        'metrics_plots': os.path.join(eval_dir, 'plots'),
+    }
+    
+    os.makedirs(paths['metrics_plots'], exist_ok=True)
+    return paths
+
+def create_metric_plots(results_df, plot_dir):
+    """Create visualization plots for metrics."""
+    metrics = ["MAE", "MAPE", "LoS_MAE", "NLoS_MAE", "LoS_wMAPE", "NLoS_wMAPE"]
+    
+    # Histogramm für jede Metrik
+    for metric in metrics:
+        plt.figure(figsize=(10, 6))
+        plt.hist(results_df[metric].dropna(), bins=30, edgecolor='black')
+        plt.title(f'Distribution of {metric}')
+        plt.xlabel(metric)
+        plt.ylabel('Count')
+        plt.savefig(os.path.join(plot_dir, f'{metric}_distribution.png'))
+        plt.close()
+    
+    # Box-Plot für alle Metriken
+    plt.figure(figsize=(12, 6))
+    results_df[metrics].boxplot()
+    plt.xticks(rotation=45)
+    plt.title('Metric Distributions (Box Plot)')
+    plt.tight_layout()
+    plt.savefig(os.path.join(plot_dir, 'metrics_boxplot.png'))
+    plt.close()
+
+def main():
+    args = parse_args()
+    
+    # Setup output directories
+    paths = setup_metric_directories(args)
+    
+    # Save evaluation config
+    eval_info = {
+        'model_type': args.model_type,
+        'data_dir': args.data_dir,
+        'pred_dir': args.pred_dir
+    }
+    
+    with open(os.path.join(os.path.dirname(paths['detailed_results']), 'metric_evaluation_config.json'), 'w') as f:
+        json.dump(eval_info, f, indent=4)
+
+    # Load test dataset
+    test_csv = pd.read_csv(os.path.join(args.data_dir, "test.csv"))
     results = []
+    errors = []
 
-    for index, sample_row in tqdm(test_df.iterrows(), total=test_df.shape[0], desc="Evaluating samples"):
-        # Korrekte Pfadkonstruktion - hier die relativen Pfade aus der CSV direkt verwenden
-        pred_path = os.path.join(args.pred_dir, f"y_{index}.png")
-        # Die ./ aus den Pfaden entfernen
-        true_soundmap_path = os.path.join(args.data_dir, sample_row.soundmap.replace("./", ""))
-        building_path = os.path.join(args.data_dir, sample_row.osm.replace("./", ""))
-
-        if not os.path.exists(pred_path):
-            print(f"Prediction for sample {index} not found.")
-            print(f"Missing: {pred_path}")
-            continue
-
-        # Debug-Ausgabe für die ersten paar Samples
-        if index < 3:
-            print(f"\nChecking paths for sample {index}:")
-            print(f"Pred path: {pred_path}")
-            print(f"True soundmap path: {true_soundmap_path}")
-            print(f"Building path: {building_path}")
-            print(f"Files exist: pred={os.path.exists(pred_path)}, true={os.path.exists(true_soundmap_path)}, building={os.path.exists(building_path)}")
-
+    print(f"\nStarting metric evaluation for {len(test_csv)} samples...")
+    for index, sample_row in tqdm(test_csv.iterrows(), total=len(test_csv), desc="Evaluating metrics"):
         try:
+            # Construct paths
+            pred_path = os.path.join(args.pred_dir, f"y_{index}.png")
+            true_soundmap_path = os.path.join(args.data_dir, sample_row.soundmap.replace("./", ""))
+            building_path = os.path.join(args.data_dir, sample_row.osm.replace("./", ""))
+
+            # Validate paths
+            if not all(os.path.exists(p) for p in [pred_path, true_soundmap_path, building_path]):
+                missing = [p for p in [pred_path, true_soundmap_path, building_path] if not os.path.exists(p)]
+                raise FileNotFoundError(f"Missing files: {missing}")
+
+            # Calculate metrics
             mae, mape, mae_in_sight, mae_not_in_sight, mape_in_sight, mape_not_in_sight = evaluate_sample(
                 true_soundmap_path,
                 pred_path,
                 building_path
             )
-            results.append([sample_row.sample_id, mae, mape, mae_in_sight, mae_not_in_sight, mape_in_sight, mape_not_in_sight])
+            results.append([
+                sample_row.sample_id, mae, mape, 
+                mae_in_sight, mae_not_in_sight, 
+                mape_in_sight, mape_not_in_sight
+            ])
+            
         except Exception as e:
-            print(f"\nError processing sample {index}: {str(e)}")
+            error_msg = f"Error processing sample {index}: {str(e)}"
+            errors.append(error_msg)
+            print(f"\n{error_msg}")
             continue
 
-    results_df = pd.DataFrame(results, columns=["sample_id", "MAE", "MAPE", "LoS_MAE", "NLoS_MAE", "LoS_wMAPE", "NLoS_wMAPE"])
-    results_df.to_csv(args.output, index=False)
-    print("\nMetrics Summary:")
-    print(results_df[["MAE", "MAPE", "LoS_MAE", "NLoS_MAE", "LoS_wMAPE", "NLoS_wMAPE"]].describe())
+    # Create results DataFrame
+    results_df = pd.DataFrame(
+        results, 
+        columns=["sample_id", "MAE", "MAPE", "LoS_MAE", "NLoS_MAE", "LoS_wMAPE", "NLoS_wMAPE"]
+    )
+    
+    # Calculate summary statistics
+    summary_stats = results_df.describe()
+    
+    # Create visualization plots
+    create_metric_plots(results_df, paths['metrics_plots'])
+    
+    # Save results
+    results_df.to_csv(paths['detailed_results'], index=False)
+    summary_stats.to_csv(paths['summary_stats'])
+    
+    if errors:
+        error_log_path = os.path.join(os.path.dirname(paths['detailed_results']), 'metric_evaluation_errors.txt')
+        with open(error_log_path, 'w') as f:
+            f.write('\n'.join(errors))
+
+    # Print summary statistics
+    print("\nMetric Evaluation Results:")
+    print("\nSummary Statistics:")
+    print(summary_stats)
+    
+    print("\nDetailed Statistics:")
+    for metric in ["MAE", "MAPE", "LoS_MAE", "NLoS_MAE", "LoS_wMAPE", "NLoS_wMAPE"]:
+        valid_values = results_df[metric].dropna()
+        if len(valid_values) > 0:
+            print(f"\n{metric}:")
+            print(f"  Mean: {valid_values.mean():.4f}")
+            print(f"  Median: {valid_values.median():.4f}")
+            print(f"  Std: {valid_values.std():.4f}")
+            print(f"  Min: {valid_values.min():.4f}")
+            print(f"  Max: {valid_values.max():.4f}")
+
+    print(f"\nEvaluation results saved to: {os.path.dirname(paths['detailed_results'])}")
+
+if __name__ == "__main__":
+    main()
