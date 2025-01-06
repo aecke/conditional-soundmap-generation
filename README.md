@@ -15,191 +15,151 @@ source venv/bin/activate  # On Windows use: venv\Scripts\activate
 2. Install required packages:
 ```bash
 pip install -r requirements.txt
+pip install numba  # Required for ray tracing calculations
 ```
 
-## Data Structure
+## Project Structure
 
-The model expects the following data structure:
-- Training data CSV containing building-soundmap pairs and environmental conditions
-- Building images
-- Sound map images (256x256 pixels)
-
-Configure the data paths in `params.json`:
-```json
-"soundmap": {
-    "data_folder": {
-        "train": {
-            "buildings": "path/to/train/buildings",
-            "soundmaps": "path/to/train/soundmaps/256",
-            "csv_path": "path/to/train.csv"
-        },
-        "test": {
-            "buildings": "path/to/test/buildings", 
-            "soundmaps": "path/to/test/soundmaps/256",
-            "csv_path": "path/to/test.csv"
-        }
-    },
-    "samples_path": "path/to/samples",
-    "checkpoints_path": "path/to/checkpoints"
-}
+The project requires the following directory structure:
 ```
-## Training, Generation and Evaluation
+project_root/
+├── src/                         # Source code directory
+│   ├── main.py                 # Training script
+│   ├── generate_soundmaps.py   # Generation script
+│   └── sound_metrics.py        # Evaluation script
+│
+├── data/                       # Base data directory for datasets
+│   ├── urban_sound_25k_baseline/
+│   ├── urban_sound_25k_diffraction/
+│   ├── urban_sound_25k_reflection/
+│   └── urban_sound_25k_combined/
+│       ├── test/              # Test dataset
+│       │   ├── test.csv      # Test set metadata
+│       │   ├── buildings/    # Building layouts
+│       │   └── soundmaps/    # Ground truth soundmaps
+│       └── train/            # Training dataset (similar structure)
+│
+└── evaluation_results/         # Evaluation outputs
+    └── urban_sound_25k_[dataset_type]/
+        ├── predictions/       # Generated soundmaps
+        └── metrics/          # Evaluation results
+```
 
-### 1. Training Commands
+### Example paths (adjust according to your setup):
+- Data Location: `E:/Schallsimulationsdaten/urban_sound_25k_[dataset_type]/`
+- Checkpoints: `E:/ba_ergebnisse/urban_sound_25k_[dataset_type]/Checkpoints/`
+- Results: `E:/ba_ergebnisse/urban_sound_25k_[dataset_type]/evaluation_results/`
 
-### Dataset-specific Training Commands
+## Training Commands
 
-1. Baseline Model (without conditions):
+All training commands use the same base structure. The only difference is the enabled conditions:
+
+### Baseline Model (no conditions):
 ```bash
-python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --checkpoint_reentrant False
+python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint
 ```
 
-2. Diffraction Model (with noise level):
+### Diffraction Model (with db):
 ```bash
-python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_db --checkpoint_reentrant False
+python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_db
 ```
 
-3. Reflection Model (with noise level):
+### Reflection Model (with db):
 ```bash
-python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_db --checkpoint_reentrant False
+python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_db
 ```
 
-4. Combined Model (with all conditions):
+### Combined Model (all conditions):
 ```bash
-python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_temperature --use_humidity --use_db --checkpoint_reentrant False
+python main.py --model glow_improved --dataset soundmap --direction building2soundmap --img_size 256 256 --n_block 4 --n_flow 8 8 8 8 --do_lu --reg_factor 0.0001 --grad_checkpoint --use_temperature --use_humidity --use_db
 ```
 
-### 2. Sample Generation
+## Generation and Evaluation
 
-After training, you can generate samples and evaluate the model using the following commands for each dataset:
+Each dataset requires two steps for evaluation:
+
+1. **Generate Samples**
 
 #### Baseline Model:
 ```bash
-python generate_soundmaps.py \
-  --checkpoint_path "path/to/urban_sound_25k_baseline/Checkpoints/soundmap/256x256/glow_improved/building2soundmap" \
-  --dataset_path "path/to/urban_sound_25k_baseline/test" \
-  --output_base "path/to/evaluation_results" \
-  --model_type "urban_sound_25k_baseline"
+python generate_soundmaps.py --checkpoint_path "E:/ba_ergebnisse/urban_sound_25k_baseline/Checkpoints/soundmap/256x256/glow_improved/building2soundmap" --dataset_path "E:/Schallsimulationsdaten/urban_sound_25k_baseline/test" --output_base "E:/ba_ergebnisse/urban_sound_25k_baseline/evaluation_results" --model_type "urban_sound_25k_baseline"
 ```
 
 #### Diffraction Model:
 ```bash
-python generate_soundmaps.py \
-  --checkpoint_path "path/to/urban_sound_25k_diffraction/Checkpoints/soundmap/256x256/glow_improved/building2soundmap" \
-  --dataset_path "path/to/urban_sound_25k_diffraction/test" \
-  --output_base "path/to/evaluation_results" \
-  --model_type "urban_sound_25k_diffraction" \
-  --use_db
+python generate_soundmaps.py --checkpoint_path "E:/ba_ergebnisse/urban_sound_25k_diffraction/Checkpoints/soundmap/256x256/glow_improved/building2soundmap" --dataset_path "E:/Schallsimulationsdaten/urban_sound_25k_diffraction/test" --output_base "E:/ba_ergebnisse/urban_sound_25k_diffraction/evaluation_results" --model_type "urban_sound_25k_diffraction" --use_db
 ```
 
 #### Reflection Model:
 ```bash
-python generate_soundmaps.py \
-  --checkpoint_path "path/to/urban_sound_25k_reflection/Checkpoints/soundmap/256x256/glow_improved/building2soundmap" \
-  --dataset_path "path/to/urban_sound_25k_reflection/test" \
-  --output_base "path/to/evaluation_results" \
-  --model_type "urban_sound_25k_reflection" \
-  --use_db
+python generate_soundmaps.py --checkpoint_path "E:/ba_ergebnisse/urban_sound_25k_reflection/Checkpoints/soundmap/256x256/glow_improved/building2soundmap" --dataset_path "E:/Schallsimulationsdaten/urban_sound_25k_reflection/test" --output_base "E:/ba_ergebnisse/urban_sound_25k_reflection/evaluation_results" --model_type "urban_sound_25k_reflection" --use_db
 ```
 
 #### Combined Model:
 ```bash
-python generate_soundmaps.py \
-  --checkpoint_path "path/to/urban_sound_25k_combined/Checkpoints/soundmap/256x256/glow_improved/building2soundmap" \
-  --dataset_path "path/to/urban_sound_25k_combined/test" \
-  --output_base "path/to/evaluation_results" \
-  --model_type "urban_sound_25k_combined" \
-  --use_temperature --use_humidity --use_db
+python generate_soundmaps.py --checkpoint_path "E:/ba_ergebnisse/urban_sound_25k_combined/Checkpoints/soundmap/256x256/glow_improved/building2soundmap" --dataset_path "E:/Schallsimulationsdaten/urban_sound_25k_combined/test" --output_base "E:/ba_ergebnisse/urban_sound_25k_combined/evaluation_results" --model_type "urban_sound_25k_combined" --use_temperature --use_humidity --use_db
 ```
 
-### 3. Model Evaluation
-
-After generating samples, run the evaluation script to calculate metrics. Replace TIMESTAMP with the timestamp of your generation run (format: YYYYMMDD_HHMMSS):
+2. **Calculate Metrics**
 
 #### Baseline Model:
 ```bash
-python sound_metrics.py \
-  --data_dir "path/to/urban_sound_25k_baseline/test" \
-  --pred_dir "path/to/evaluation_results/urban_sound_25k_baseline/predictions" \
-  --output_dir "path/to/evaluation_results" \
-  --model_type "urban_sound_25k_baseline"
+python sound_metrics.py --data_dir "E:/Schallsimulationsdaten/urban_sound_25k_baseline/test" --pred_dir "E:/ba_ergebnisse/urban_sound_25k_baseline/evaluation_results/urban_sound_25k_baseline/predictions" --output_dir "E:/ba_ergebnisse/urban_sound_25k_baseline/evaluation_results" --model_type "urban_sound_25k_baseline"
 ```
 
 #### Diffraction Model:
 ```bash
-python sound_metrics.py \
-  --data_dir "path/to/urban_sound_25k_diffraction/test" \
-  --pred_dir "path/to/evaluation_results/urban_sound_25k_diffraction/predictions" \
-  --output_dir "path/to/evaluation_results" \
-  --model_type "urban_sound_25k_diffraction"
+python sound_metrics.py --data_dir "E:/Schallsimulationsdaten/urban_sound_25k_diffraction/test" --pred_dir "E:/ba_ergebnisse/urban_sound_25k_diffraction/evaluation_results/urban_sound_25k_diffraction/predictions" --output_dir "E:/ba_ergebnisse/urban_sound_25k_diffraction/evaluation_results" --model_type "urban_sound_25k_diffraction"
 ```
 
 #### Reflection Model:
 ```bash
-python sound_metrics.py \
-  --data_dir "path/to/urban_sound_25k_reflection/test" \
-  --pred_dir "path/to/evaluation_results/urban_sound_25k_reflection/predictions" \
-  --output_dir "path/to/evaluation_results" \
-  --model_type "urban_sound_25k_reflection"
+python sound_metrics.py --data_dir "E:/Schallsimulationsdaten/urban_sound_25k_reflection/test" --pred_dir "E:/ba_ergebnisse/urban_sound_25k_reflection/evaluation_results/urban_sound_25k_reflection/predictions" --output_dir "E:/ba_ergebnisse/urban_sound_25k_reflection/evaluation_results" --model_type "urban_sound_25k_reflection"
 ```
 
 #### Combined Model:
 ```bash
-python sound_metrics.py \
-  --data_dir "path/to/urban_sound_25k_combined/test" \
-  --pred_dir "path/to/evaluation_results/urban_sound_25k_combined/predictions" \
-  --output_dir "path/to/evaluation_results" \
-  --model_type "urban_sound_25k_combined"
+python sound_metrics.py --data_dir "E:/Schallsimulationsdaten/urban_sound_25k_combined/test" --pred_dir "E:/ba_ergebnisse/urban_sound_25k_combined/evaluation_results/urban_sound_25k_combined/predictions" --output_dir "E:/ba_ergebnisse/urban_sound_25k_combined/evaluation_results" --model_type "urban_sound_25k_combined"
 ```
 
-### Evaluation Metrics
+## Evaluation Metrics
 
-The evaluation script calculates the following metrics:
-- MAE (Mean Absolute Error)
-- MAPE (Mean Absolute Percentage Error)
-- LoS (Line of Sight) specific metrics
-  - LoS_MAE: MAE for visible areas
-  - NLoS_MAE: MAE for non-visible areas
-  - LoS_wMAPE: Weighted MAPE for visible areas
-  - NLoS_wMAPE: Weighted MAPE for non-visible areas
+The evaluation script calculates several metrics:
+- **MAE (Mean Absolute Error):** Average absolute difference between predicted and true values
+- **MAPE (Mean Absolute Percentage Error):** Average percentage difference between predicted and true values
 
-### Output Structure
+### Line of Sight (LoS) Metrics:
+- **LoS_MAE:** MAE for areas with direct line of sight to the sound source
+- **NLoS_MAE:** MAE for areas without direct line of sight
+- **LoS_wMAPE:** Weighted MAPE for visible areas
+- **NLoS_wMAPE:** Weighted MAPE for non-visible areas
 
-The evaluation creates the following directory structure:
+## Output Structure
+
+Evaluation results are organized as follows:
 ```
 evaluation_results/
-├── urban_sound_25k_baseline/
-├── urban_sound_25k_diffraction/
-├── urban_sound_25k_combined/
-└── urban_sound_25k_reflection/
-    └── TIMESTAMP/
-        ├── predictions/          # Generated soundmaps
-        ├── metrics/             # Evaluation results
-        │   ├── inference_times.csv
-        │   ├── performance_statistics.json
-        │   ├── detailed_results.csv
-        │   ├── summary_statistics.csv
-        │   └── plots/          # Visualization plots
-        ├── logs/               # Error logs
-        └── evaluation_config.json
+└── urban_sound_25k_[dataset_type]/
+    ├── predictions/          # Generated soundmaps
+    ├── metrics/             # Evaluation results
+    │   ├── detailed_results.csv         # Per-sample metrics
+    │   ├── summary_statistics.csv       # Statistical overview
+    │   └── plots/                      # Metric visualizations
+    └── logs/                # Error logs
+```
 
+## Required CSV Format
 
-### CSV Format for Environmental Conditions
-When using environmental conditions, your CSV file should contain the following columns:
-- `osm`: Path to building image
-- `soundmap`: Path to soundmap image
-- `temperature`: Temperature value (if using --use_temperature)
-- `humidity`: Humidity value (if using --use_humidity)
-- `db`: Decibel value (if using --use_db)
-
-Example CSV format:
+The `test.csv` file must contain:
 ```csv
 osm,soundmap,temperature,humidity,db
 buildings/001.png,soundmaps/001.png,25.5,65.0,{"lwd500": 75.2}
 buildings/002.png,soundmaps/002.png,23.8,70.0,{"lwd500": 68.4}
 ```
 
-Note: The db values are stored as JSON strings containing the "lwd500" key.
+### Note:
+- `db` values are JSON strings with "lwd500" key
+- All paths are relative to the data directory
 
 ### Training Parameters
 
