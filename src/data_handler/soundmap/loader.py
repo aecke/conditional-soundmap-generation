@@ -12,10 +12,13 @@ class SoundMapDataset(data.Dataset):
     SCALER_FILENAME = 'extra_cond_scaler.save'
     # test
     def __init__(self, data_folder, is_train=True, img_size=(256, 256), 
-                 use_temperature=False, use_humidity=False, use_db=False):
+                 use_temperature=False, use_humidity=False, use_db=False, min_pixel_value=0.01):
+        self.min_pixel_value = min_pixel_value
+        # Custom normalization transform
         self.transforms = transforms.Compose([
             transforms.Resize(img_size),
             transforms.ToTensor(),
+            transforms.Lambda(lambda x: self._normalize_tensor(x))  # Custom normalization
         ])
         
         self.img_size = img_size
@@ -71,7 +74,12 @@ class SoundMapDataset(data.Dataset):
             self.data[self.extra_cond_cols] = self.scaler.transform(self.data[self.extra_cond_cols])
             
         print(f"Found {len(self.data)} entries in {'train' if is_train else 'test'} set")
-
+    
+    def _normalize_tensor(self, x):
+        """Custom normalization to ensure minimum value"""
+        # Rescale from [0,1] to [min_value,1]
+        return x * (1 - self.min_pixel_value) + self.min_pixel_value
+    
     def __len__(self):
         return len(self.data)
 

@@ -103,17 +103,17 @@
 
     "data_folder": {
       "train": {
-          "buildings": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/train/buildings",
-          "soundmaps": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/train/soundmaps/256",
-          "csv_path": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/train/train.csv"
+          "buildings": "E:/Schallsimulationsdaten/urban_sound_25k_baseline/train/buildings",
+          "soundmaps": "E:/Schallsimulationsdaten/urban_sound_25k_baseline/train/soundmaps/256",
+          "csv_path": "E:/Schallsimulationsdaten/urban_sound_25k_baseline/train/train.csv"
       },
       "test": {
-          "buildings": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/test/buildings",
-          "soundmaps": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/test/soundmaps/256",
-          "csv_path": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/test/test.csv"
+          "buildings": "E:/Schallsimulationsdaten/urban_sound_25k_baseline/test/buildings",
+          "soundmaps": "E:/Schallsimulationsdaten/urban_sound_25k_baseline/test/soundmaps/256",
+          "csv_path": "E:/Schallsimulationsdaten/urban_sound_25k_baseline/test/test.csv"
       }
     },
-    "samples_path": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/samples",
-    "checkpoints_path": "C:/Users/ACE/Documents/CNF_temp_db_condition/data/urban_sound_25k_combined/Checkpoints"
+    "samples_path": "E:/Schallsimulationsdaten/urban_sound_25k_baseline/samples",
+    "checkpoints_path": "E:/Schallsimulationsdaten/urban_sound_25k_baseline/Checkpoints"
   }
 }
