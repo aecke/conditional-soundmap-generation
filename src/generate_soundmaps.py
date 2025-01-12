@@ -266,7 +266,7 @@ def main():
                 utils.save_image(
                     sampled_images[0],
                     os.path.join(paths['predictions'], f"y_{idx}.png"),
-                    normalize=True
+                    normalize=False
                 )
                 
                 # Log successful inference time
