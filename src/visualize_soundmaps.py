@@ -101,23 +101,17 @@ def plot_soundmaps(sample_data, pred_path, test_dir, add_buildings=True):
     los_error = np.where(pixels_in_sight, error_map, 0)
     nlos_error = np.where(pixels_not_in_sight, error_map, 0)
 
-    # Create figure with 5 subplots and adjusted height
-    fig = plt.figure(figsize=(30, 10))  # Erhöhe die Höhe der Figure
+    # Create figure with 5 subplots
+    fig = plt.figure(figsize=(30, 8))
 
     # Update GridSpec for 5 subplots
-    gs = plt.GridSpec(2, 5, figure=fig, height_ratios=[1, 0.05]) #Definiere höheverhältnis
-    gs.update(left=0.02, right=0.98, top=0.95, bottom=0.1, wspace=0.05, hspace=0.05) #Anpassung für höhe
+    gs = plt.GridSpec(1, 5, figure=fig)
+    gs.update(left=0.02, right=0.85, top=0.85, bottom=0.15, wspace=0.05)
 
     axes = []
     for i in range(5):  # Create 5 subplots
         ax = fig.add_subplot(gs[0, i])
         axes.append(ax)
-    
-    # Platzhalter für die Colorbar-Axes
-    cbar_ax = fig.add_subplot(gs[1, :2])  # Colorbar für Soundmaps, erste zwei Spalten
-    cbar_ax2 = fig.add_subplot(gs[1, 2:4])  # Colorbar für Absoluten Error, Spalten 3 und 4
-    cbar_ax.axis('off')  # Verstecke die eigentlichen Axes
-    cbar_ax2.axis('off')  # Verstecke die eigentlichen Axes
 
     # Find global min/max for consistent scaling
     vmin_sound = min(np.min(true_soundmap), np.min(pred_soundmap))
@@ -136,6 +130,8 @@ def plot_soundmaps(sample_data, pred_path, test_dir, add_buildings=True):
     im2 = axes[1].imshow(pred_soundmap, cmap='viridis', vmin=vmin_sound, vmax=vmax_sound)
     im3 = axes[2].imshow(los_error, cmap='viridis', vmin=vmin_error, vmax=vmax_error)
     im4 = axes[3].imshow(nlos_error, cmap='viridis', vmin=vmin_error, vmax=vmax_error)
+
+    # Plot absolute error with custom colormap
     im5 = axes[4].imshow(error_map, cmap=error_cmap, vmin=0, vmax=np.max(error_map))
 
     titles = [
@@ -162,18 +158,17 @@ def plot_soundmaps(sample_data, pred_path, test_dir, add_buildings=True):
         ax.spines['bottom'].set_visible(False)
         ax.spines['left'].set_visible(False)
 
-    # Add colorbar for soundmaps and error maps UNTER the plots
-    cbar = fig.colorbar(im1, cax=cbar_ax, orientation='horizontal')
-    cbar.set_label('Decibels (dB)', fontsize=COLORBAR_LABEL_SIZE)
+    # Add colorbar for soundmaps and error maps
+    cbar_ax = fig.add_axes([0.87, 0.15, 0.015, 0.7])
+    cbar = fig.colorbar(im1, cax=cbar_ax, orientation='vertical')
+    cbar.set_label('decibels (dB)', fontsize=COLORBAR_LABEL_SIZE)
     cbar.ax.tick_params(labelsize=COLORBAR_TICK_SIZE)
 
-    # Add colorbar for absolute error UNTER the plots
-    cbar2 = fig.colorbar(im5, cax=cbar_ax2, orientation='horizontal')
+    # Add colorbar for absolute error
+    cbar_ax2 = fig.add_axes([0.91, 0.15, 0.015, 0.7])
+    cbar2 = fig.colorbar(im5, cax=cbar_ax2, orientation='vertical')
     cbar2.set_label('Absolute Error (dB)', fontsize=COLORBAR_LABEL_SIZE)
     cbar2.ax.tick_params(labelsize=COLORBAR_TICK_SIZE)
-    
-    # Remove the extra space at the bottom
-    fig.subplots_adjust(bottom=0.05)
 
     return fig
 
