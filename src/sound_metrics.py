@@ -175,13 +175,13 @@ def evaluate_sample(true_path, pred_path, osm_path=None):
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluate generated soundmaps")
     parser.add_argument("--data_dir", type=str, required=True,
-                      help="Directory containing test dataset")
+                        help="Directory containing test dataset")
     parser.add_argument("--pred_dir", type=str, required=True,
-                      help="Directory containing predictions to evaluate")
+                        help="Directory containing predictions to evaluate")
     parser.add_argument("--output_dir", type=str, required=True,
-                      help="Directory for evaluation outputs")
+                        help="Directory for evaluation outputs")
     parser.add_argument("--model_type", type=str, required=True,
-                      help="Type of model being evaluated (with_extra_conditions or without_extra_conditions)")
+                        help="Type of model being evaluated (with_extra_conditions or without_extra_conditions)")
     return parser.parse_args()
 
 def setup_metric_directories(args):
