@@ -1,8 +1,16 @@
+from torchvision import transforms
+import numpy as np
 import torch
+from copy import deepcopy
+import torch.nn as nn
 
-from ..glow import *
-import helper
+from globals import device
+from models.glow.utils import calc_z_shapes, calc_inp_shapes, calc_cond_shapes, calc_cond_shapes_with_extra # <-- Hier fehlten die imports
+from ..glow.cond_net import ExtraCondNet
+from ..glow.utils import *
+from ..glow import init_glow
 
+#updated extra cond handling
 
 class TwoGlows(nn.Module):
     def __init__(self, params, left_configs, right_configs):
@@ -54,78 +62,16 @@ class TwoGlows(nn.Module):
             )
 
         self.left_glow = init_glow(n_blocks=params['n_block'],
-                                 n_flows=params['n_flow'],
-                                 input_shapes=input_shapes,
-                                 cond_shapes=None,
-                                 configs=left_configs)
+                                    n_flows=params['n_flow'],
+                                    input_shapes=input_shapes,
+                                    cond_shapes=None,
+                                    configs=left_configs)
 
         self.right_glow = init_glow(n_blocks=params['n_block'],
-                                  n_flows=params['n_flow'],
-                                  input_shapes=input_shapes,
-                                  cond_shapes=cond_shapes,
-                                  configs=right_configs)
-
-    def prep_conds(self, left_glow_out, extra_cond, direction):
-        act_cond = left_glow_out['all_act_outs']
-        w_cond = left_glow_out['all_w_outs']
-        coupling_cond = left_glow_out['all_flows_outs']
-
-        # Verarbeite numerische Conditions wenn vorhanden
-        extra_cond_features = None
-        if self.has_extra_cond and extra_cond is not None:
-            # Debug print
-            print(f"Extra cond shape before extra_cond net: {extra_cond.shape}")
-            
-            # Ensure extra_cond has correct shape
-            if len(extra_cond.shape) == 1:
-                extra_cond = extra_cond.unsqueeze(0)  # Add batch dimension
-                
-            extra_cond_features = self.extra_cond_net(extra_cond)  
-            print(f"extra_cond features shape after net: {extra_cond_features.shape}")
-
-        # Für jeden Block und Flow die Bedingungen vorbereiten
-        for block_idx in range(len(act_cond)):
-            for flow_idx in range(len(act_cond[block_idx])):
-                base_features = act_cond[block_idx][flow_idx]
-                batch_size, _, height, width = base_features.shape
-                
-                if extra_cond_features is not None:
-                    # Ensure extra_cond_features matches batch size
-                    if extra_cond_features.size(0) != batch_size:
-                        extra_cond_features = extra_cond_features.expand(batch_size, -1)
-                    
-                    # Erweitere numerische Features auf räumliche Dimensionen
-                    num_features = extra_cond_features.unsqueeze(-1).unsqueeze(-1)
-                    num_features = num_features.expand(-1, -1, height, width)
-                    
-                    print(f"Base features shape: {base_features.shape}")
-                    print(f"extra_cond features expanded shape: {num_features.shape}")
-                    
-                    # Konkateniere Features
-                    combined_features = torch.cat([base_features, num_features], dim=1)
-                    print(f"Combined features shape: {combined_features.shape}")
-                else:
-                    combined_features = base_features
-
-                # Update conditions
-                act_cond[block_idx][flow_idx] = combined_features
-                w_cond[block_idx][flow_idx] = combined_features
-                coupling_cond[block_idx][flow_idx] = combined_features
-
-        # Erstelle Conditions Dictionary
-        conditions = {
-            'act_cond': act_cond,
-            'w_cond': w_cond,
-            'coupling_cond': coupling_cond
-        }
-
-        # Kehre Listen für Reverse-Operation um
-        if direction == 'reverse':
-            conditions['act_cond'] = [list(reversed(cond)) for cond in list(reversed(conditions['act_cond']))]
-            conditions['w_cond'] = [list(reversed(cond)) for cond in list(reversed(conditions['w_cond']))]
-            conditions['coupling_cond'] = [list(reversed(cond)) for cond in list(reversed(conditions['coupling_cond']))]
-        
-        return conditions
+                                    n_flows=params['n_flow'],
+                                    input_shapes=input_shapes,
+                                    cond_shapes=cond_shapes,
+                                    configs=right_configs)
 
     def forward(self, x_a, x_b, extra_cond=None):
         """
@@ -167,6 +113,12 @@ class TwoGlows(nn.Module):
         w_cond = left_glow_out['all_w_outs']
         coupling_cond = left_glow_out['all_flows_outs']
 
+        # Entferne die unnötige Umkehrung der Listen im Reverse-Fall
+        # if direction == 'reverse':
+        #     act_cond = [list(reversed(cond)) for cond in list(reversed(act_cond))]
+        #     w_cond = [list(reversed(cond)) for cond in list(reversed(w_cond))]
+        #     coupling_cond = [list(reversed(cond)) for cond in list(reversed(coupling_cond))]
+
         for block_idx in range(len(act_cond)):
             for flow_idx in range(len(act_cond[block_idx])):
                 base_features = act_cond[block_idx][flow_idx]
@@ -181,7 +133,7 @@ class TwoGlows(nn.Module):
                     extra_spatial = extra_features.unsqueeze(-1).unsqueeze(-1)
                     extra_spatial = extra_spatial.expand(-1, -1, height, width)
                     
-                    # Concatenate with base features
+                    # Korrekte Konkatenation außerhalb der Schleife
                     combined_features = torch.cat([base_features, extra_spatial], dim=1)
                 else:
                     combined_features = base_features
@@ -196,26 +148,23 @@ class TwoGlows(nn.Module):
             'coupling_cond': coupling_cond
         }
 
-        if direction == 'reverse':
-            conditions['act_cond'] = [list(reversed(cond)) for cond in list(reversed(conditions['act_cond']))]
-            conditions['w_cond'] = [list(reversed(cond)) for cond in list(reversed(conditions['w_cond']))]
-            conditions['coupling_cond'] = [list(reversed(cond)) for cond in list(reversed(conditions['coupling_cond']))]
-
         return conditions
 
     def reverse(self, x_a=None, z_b_samples=None, extra_cond=None, reconstruct=False):
         left_glow_out = self.left_glow(x_a)
         
-        if self.has_extra_cond and extra_cond is not None:
+        # Immer Extra-Conditions verwenden, wenn self.has_extra_cond True ist
+        if self.has_extra_cond:
             # Ensure extra_cond is on same device as model
             if not isinstance(extra_cond, torch.Tensor):
                 extra_cond = torch.tensor(extra_cond, dtype=torch.float32)
             extra_cond = extra_cond.to(self.extra_net.net[0].weight.device)
             extra_features = self.extra_net(extra_cond)
-            conditions = self.prep_conds(left_glow_out, extra_features, direction='reverse')
         else:
-            conditions = self.prep_conds(left_glow_out, None, direction='reverse')
+            extra_features = None
             
+        conditions = self.prep_conds(left_glow_out, extra_features, direction='reverse')
+
         x_b_syn = self.right_glow.reverse(z_b_samples, reconstruct=reconstruct, conditions=conditions)
         return x_b_syn
 

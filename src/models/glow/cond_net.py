@@ -8,17 +8,17 @@ def compute_batch_stats(inp):
         flatten = inp.permute(1, 0, 2, 3).contiguous().view(inp.shape[1], -1)
         mean = (
             flatten.mean(1)
-                .unsqueeze(1)
-                .unsqueeze(2)
-                .unsqueeze(3)
-                .permute(1, 0, 2, 3)
+            .unsqueeze(1)
+            .unsqueeze(2)
+            .unsqueeze(3)
+            .permute(1, 0, 2, 3)
         )
         std = (
             flatten.std(1)
-                .unsqueeze(1)
-                .unsqueeze(2)
-                .unsqueeze(3)
-                .permute(1, 0, 2, 3)
+            .unsqueeze(1)
+            .unsqueeze(2)
+            .unsqueeze(3)
+            .permute(1, 0, 2, 3)
         )
         return mean, std
 
@@ -97,7 +97,7 @@ class ConvNet(nn.Module):
         n_convs = 2  # convolutions other than 1x1
         conv_stride = 1
         conv_net_out_h, conv_net_out_w = compute_conv_out_shape(inp_shape, n_convs=n_convs,
-                                                                kernel_size=3, stride=conv_stride)
+                                                               kernel_size=3, stride=conv_stride)
         down_sampling_channels = 8
         final_conv_channels = 2
         self.conv_net_out_shape = final_conv_channels * conv_net_out_h * conv_net_out_w
