@@ -99,7 +99,7 @@ python main.py --model glow_improved --dataset soundmap --direction building2sou
 The repository includes several evaluation scripts:
 
 ```
-src/
+evaluation/
 ├── analyze_checkpoints.py       # Analyze training checkpoints
 ├── analyze_logs.py             # Analyze training logs
 ├── condition_analysis.py       # Analyze conditioning impact
